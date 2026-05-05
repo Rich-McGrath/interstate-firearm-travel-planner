@@ -1,4 +1,5 @@
 import type { FopaAnalysis, TripInput } from '../types/domain'
+import { tripDestination, tripOrigin } from '../types/domain'
 import { getStateProfile } from '../data/states'
 
 // Pure function. Implements the federal interstate-transport baseline of
@@ -67,8 +68,10 @@ export function evaluateFopa(trip: TripInput): FopaAnalysis {
   // Origin and destination lawful possession — we only know the state-level
   // seed dataset, not the user's specific status. Always raise this as a
   // condition the user must satisfy themselves.
-  const originState = trip.originStateCode ?? parseStateCode(trip.origin)
-  const destinationState = trip.destinationStateCode ?? parseStateCode(trip.destination)
+  const origin = tripOrigin(trip)
+  const destination = tripDestination(trip)
+  const originState = origin?.stateCode ?? parseStateCode(origin?.label ?? '')
+  const destinationState = destination?.stateCode ?? parseStateCode(destination?.label ?? '')
 
   if (!originState || !destinationState) {
     warnings.push(

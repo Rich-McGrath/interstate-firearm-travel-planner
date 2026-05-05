@@ -1,13 +1,19 @@
 import { describe, it, expect } from 'vitest'
 import { evaluateFopa } from '../rules/evaluateFopa'
-import type { TripInput } from '../types/domain'
+import type { TripInput, TripStop } from '../types/domain'
+
+function stop(label: string, stateCode?: string): TripStop {
+  return {
+    id: label,
+    label,
+    coords: { lng: 0, lat: 0 },
+    ...(stateCode ? { stateCode } : {}),
+  }
+}
 
 function baseTrip(overrides: Partial<TripInput> = {}): TripInput {
   return {
-    origin: 'Boston, MA',
-    destination: 'Pittsburgh, PA',
-    originStateCode: 'MA',
-    destinationStateCode: 'PA',
+    stops: [stop('Boston, MA', 'MA'), stop('Pittsburgh, PA', 'PA')],
     hasPermit: true,
     permitState: 'MA',
     firearmType: 'handgun',
@@ -54,18 +60,17 @@ describe('evaluateFopa', () => {
     const out = evaluateFopa(
       baseTrip({ vehicleHasSeparateTrunk: false, lockedContainerUsed: true })
     )
-    // Still potentially qualifies, but warns about glove-box / console.
     expect(out.qualifiesPotentially).toBe(true)
     expect(out.warnings.some((w) => /glove/i.test(w))).toBe(true)
   })
 
-  it('returns manual_review when origin/destination state cannot be parsed', () => {
+  it('returns manual_review when origin/destination state cannot be determined', () => {
     const out = evaluateFopa(
       baseTrip({
-        origin: 'unknown place',
-        destination: 'somewhere else',
-        originStateCode: undefined,
-        destinationStateCode: undefined,
+        stops: [
+          { id: '1', label: 'unknown place', coords: { lng: 0, lat: 0 } },
+          { id: '2', label: 'somewhere else', coords: { lng: 0, lat: 0 } },
+        ],
       })
     )
     expect(out.qualifiesPotentially).toBe('manual_review')
@@ -80,5 +85,19 @@ describe('evaluateFopa', () => {
   it('returns manual_review when a suppressor is in the transport list', () => {
     const out = evaluateFopa(baseTrip({ transportedItems: ['handgun', 'suppressor'] }))
     expect(out.qualifiesPotentially).toBe('manual_review')
+  })
+
+  it('handles trips with intermediate waypoints', () => {
+    const trip = baseTrip({
+      stops: [
+        stop('Boston, MA', 'MA'),
+        stop('Albany, NY', 'NY'),
+        stop('Cleveland, OH', 'OH'),
+        stop('Pittsburgh, PA', 'PA'),
+      ],
+    })
+    const out = evaluateFopa(trip)
+    // Origin (MA) and destination (PA) are still the bookends
+    expect(out.qualifiesPotentially).toBe(true)
   })
 })

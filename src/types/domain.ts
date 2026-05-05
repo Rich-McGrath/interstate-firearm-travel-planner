@@ -25,16 +25,18 @@ export interface Coordinate {
   lat: number
 }
 
+export interface TripStop {
+  id: string
+  label: string
+  coords?: Coordinate
+  stateCode?: string
+}
+
 export interface TripInput {
-  origin: string
-  destination: string
-  // Set when the user picks an autocomplete suggestion. Used by the
-  // directions API to compute a real route. If absent, the trip is
-  // submitted with text-only addresses and the directions call is skipped.
-  originCoords?: Coordinate
-  destinationCoords?: Coordinate
-  originStateCode?: string
-  destinationStateCode?: string
+  // Ordered list of stops. stops[0] is origin, stops[stops.length - 1] is
+  // destination, and any entries between are user-planned waypoints. Must
+  // have length >= 2 to be a valid trip.
+  stops: TripStop[]
   hasPermit: boolean
   permitState?: string
   firearmType: FirearmType
@@ -45,6 +47,22 @@ export interface TripInput {
   firearmAccessibleFromPassengerCompartment: boolean
   vehicleHasSeparateTrunk: boolean
   lockedContainerUsed: boolean
+}
+
+// Convenience accessors so the rules engine doesn't have to reach into
+// the array directly. Consumers should treat these as the "well-formed
+// trip" view of TripInput.
+export function tripOrigin(t: TripInput): TripStop | undefined {
+  return t.stops[0]
+}
+
+export function tripDestination(t: TripInput): TripStop | undefined {
+  return t.stops[t.stops.length - 1]
+}
+
+export function tripIntermediates(t: TripInput): TripStop[] {
+  if (t.stops.length <= 2) return []
+  return t.stops.slice(1, -1)
 }
 
 export interface Waypoint {

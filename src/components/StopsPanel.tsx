@@ -33,7 +33,7 @@ export default function StopsPanel({
   return (
     <section className="card">
       <header className="card__header">
-        <h2>Recommended lower-apparent-risk stops</h2>
+        <h2>Suggested refueling stops</h2>
         <span className="muted">{scored.length} matches</span>
       </header>
 

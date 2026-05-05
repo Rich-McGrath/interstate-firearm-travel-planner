@@ -82,7 +82,7 @@ export default function AddressAutocomplete({ label, value, onChange, placeholde
   return (
     <div className="autocomplete" ref={containerRef}>
       <label className="field">
-        <span>{label}</span>
+        {label && <span>{label}</span>}
         <input
           type="text"
           value={value}

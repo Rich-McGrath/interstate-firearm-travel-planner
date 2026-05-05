@@ -13,7 +13,12 @@ import { evaluateRestrictions } from './rules/evaluateRestrictions'
 import { scoreRouteRisk } from './rules/scoreRouteRisk'
 import { generateChecklist } from './utils/checklist'
 import { getDirections, type DirectionsRoute } from './services/mapboxClient'
-import type { RouteOption, TripInput } from './types/domain'
+import {
+  tripDestination,
+  tripOrigin,
+  type RouteOption,
+  type TripInput,
+} from './types/domain'
 
 const LEGAL_DISCLAIMER =
   'Informational only. Not legal advice. No guarantee of compliance, reciprocity, or personal safety.'
@@ -41,19 +46,25 @@ export default function App() {
   const [selectedRouteId, setSelectedRouteId] = useState<string>('')
   const [selectedStopIds, setSelectedStopIds] = useState<string[]>([])
 
-  // Fetch directions from the Pages Function whenever a trip is submitted.
+  // Fetch directions whenever a trip is submitted. Passes every stop's
+  // coordinates to the Pages Function so the route honors waypoints.
   useEffect(() => {
-    if (!trip || !trip.originCoords || !trip.destinationCoords) return
+    if (!trip) return
+    const stopsWithCoords = trip.stops
+      .map((s) => s.coords)
+      .filter((c): c is { lng: number; lat: number } => Boolean(c))
+    if (stopsWithCoords.length < 2) return
+
     let cancelled = false
     setRoutesLoading(true)
     setRoutesError(null)
-    getDirections(trip.originCoords, trip.destinationCoords)
+    getDirections(stopsWithCoords)
       .then((rs) => {
         if (cancelled) return
         const opts = rs.map(toRouteOption)
         setRoutes(opts)
         setSelectedRouteId(opts[0]?.id ?? '')
-        if (opts.length === 0) setRoutesError('No route returned for this origin and destination.')
+        if (opts.length === 0) setRoutesError('No route returned for these stops.')
       })
       .catch((err: Error) => {
         if (cancelled) return
@@ -92,7 +103,18 @@ export default function App() {
     )
   }
 
-  const selectedStops = MOCK_STOPS.filter((s) => selectedStopIds.includes(s.id))
+  const selectedSuggestedStops = MOCK_STOPS.filter((s) => selectedStopIds.includes(s.id))
+
+  // For exports, pass the full trip: origin, user-planned waypoints, then
+  // any selected suggested refueling stops, and finally the destination.
+  const exportPayload = (() => {
+    if (!trip) return null
+    const origin = tripOrigin(trip)
+    const dest = tripDestination(trip)
+    if (!origin || !dest) return null
+    const userWaypoints = trip.stops.slice(1, -1)
+    return { origin, dest, userWaypoints, suggestedWaypoints: selectedSuggestedStops }
+  })()
 
   return (
     <div className="app">
@@ -125,7 +147,7 @@ export default function App() {
           </section>
         )}
 
-        {evaluation && trip && (
+        {evaluation && trip && exportPayload && (
           <>
             <RouteSummary
               routes={routes}
@@ -151,9 +173,10 @@ export default function App() {
             />
 
             <ExportPanel
-              origin={trip.origin}
-              destination={trip.destination}
-              selectedStops={selectedStops}
+              origin={exportPayload.origin.label}
+              destination={exportPayload.dest.label}
+              userWaypoints={exportPayload.userWaypoints}
+              suggestedStops={exportPayload.suggestedWaypoints}
               checklist={evaluation.checklist}
             />
           </>

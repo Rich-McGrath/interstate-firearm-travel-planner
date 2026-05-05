@@ -1,11 +1,19 @@
 import { describe, it, expect } from 'vitest'
 import { evaluateRestrictions } from '../rules/evaluateRestrictions'
-import type { TripInput } from '../types/domain'
+import type { TripInput, TripStop } from '../types/domain'
+
+function stop(label: string, stateCode?: string): TripStop {
+  return {
+    id: label,
+    label,
+    coords: { lng: 0, lat: 0 },
+    ...(stateCode ? { stateCode } : {}),
+  }
+}
 
 function trip(overrides: Partial<TripInput> = {}): TripInput {
   return {
-    origin: 'Boston, MA',
-    destination: 'Pittsburgh, PA',
+    stops: [stop('Boston, MA', 'MA'), stop('Pittsburgh, PA', 'PA')],
     hasPermit: true,
     permitState: 'MA',
     firearmType: 'handgun',

@@ -1,13 +1,12 @@
 import { useState } from 'react'
 import type {
-  Coordinate,
   FirearmType,
   TransportItem,
   TripInput,
+  TripStop,
 } from '../types/domain'
-import AddressAutocomplete from './AddressAutocomplete'
+import StopList from './StopList'
 import StateAutocomplete from './StateAutocomplete'
-import type { GeocodeSuggestion } from '../services/mapboxClient'
 
 interface Props {
   onSubmit: (trip: TripInput) => void
@@ -27,18 +26,15 @@ const ALL_TRANSPORT_ITEMS: { value: TransportItem; label: string }[] = [
 
 const FIREARM_TYPES: FirearmType[] = ['handgun', 'rifle', 'shotgun', 'ar_style', 'other']
 
-export default function TripForm({ onSubmit, initial }: Props) {
-  const [origin, setOrigin] = useState(initial?.origin ?? '')
-  const [originCoords, setOriginCoords] = useState<Coordinate | undefined>(initial?.originCoords)
-  const [originState, setOriginState] = useState<string | undefined>(initial?.originStateCode)
+function defaultStops(): TripStop[] {
+  return [
+    { id: crypto.randomUUID(), label: '' },
+    { id: crypto.randomUUID(), label: '' },
+  ]
+}
 
-  const [destination, setDestination] = useState(initial?.destination ?? '')
-  const [destinationCoords, setDestinationCoords] = useState<Coordinate | undefined>(
-    initial?.destinationCoords
-  )
-  const [destinationState, setDestinationState] = useState<string | undefined>(
-    initial?.destinationStateCode
-  )
+export default function TripForm({ onSubmit, initial }: Props) {
+  const [stops, setStops] = useState<TripStop[]>(initial?.stops ?? defaultStops())
 
   const [hasPermit, setHasPermit] = useState(initial?.hasPermit ?? true)
   const [permitState, setPermitState] = useState(initial?.permitState ?? 'MA')
@@ -61,43 +57,22 @@ export default function TripForm({ onSubmit, initial }: Props) {
 
   const [errors, setErrors] = useState<string[]>([])
 
-  function handleOriginChange(label: string, suggestion?: GeocodeSuggestion) {
-    setOrigin(label)
-    if (suggestion) {
-      setOriginCoords({ lng: suggestion.lng, lat: suggestion.lat })
-      setOriginState(suggestion.stateCode)
-    } else {
-      setOriginCoords(undefined)
-      setOriginState(undefined)
-    }
-  }
-
-  function handleDestinationChange(label: string, suggestion?: GeocodeSuggestion) {
-    setDestination(label)
-    if (suggestion) {
-      setDestinationCoords({ lng: suggestion.lng, lat: suggestion.lat })
-      setDestinationState(suggestion.stateCode)
-    } else {
-      setDestinationCoords(undefined)
-      setDestinationState(undefined)
-    }
-  }
-
   function toggleItem(item: TransportItem) {
-    setItems((prev) =>
-      prev.includes(item) ? prev.filter((i) => i !== item) : [...prev, item]
-    )
+    setItems((prev) => (prev.includes(item) ? prev.filter((i) => i !== item) : [...prev, item]))
   }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     const errs: string[] = []
-    if (!origin.trim()) errs.push('Origin is required.')
-    if (!destination.trim()) errs.push('Destination is required.')
-    if (!originCoords) errs.push('Pick a suggestion from the Origin dropdown so we can compute a route.')
-    if (!destinationCoords)
-      errs.push('Pick a suggestion from the Destination dropdown so we can compute a route.')
-    if (hasPermit && !permitState.trim()) errs.push('Permit state is required when a permit is reported.')
+    if (stops.length < 2) errs.push('At least an origin and destination are required.')
+    stops.forEach((s, i) => {
+      const role = i === 0 ? 'Origin' : i === stops.length - 1 ? 'Destination' : `Stop ${i}`
+      if (!s.label.trim()) errs.push(`${role} address is required.`)
+      if (!s.coords)
+        errs.push(`Pick a suggestion from the ${role} dropdown so we can compute a route.`)
+    })
+    if (hasPermit && !permitState.trim())
+      errs.push('Permit state is required when a permit is reported.')
     let mag: number | undefined
     if (magazineCapacity.trim()) {
       const parsed = Number(magazineCapacity)
@@ -113,12 +88,7 @@ export default function TripForm({ onSubmit, initial }: Props) {
     }
     setErrors([])
     onSubmit({
-      origin: origin.trim(),
-      destination: destination.trim(),
-      ...(originCoords ? { originCoords } : {}),
-      ...(destinationCoords ? { destinationCoords } : {}),
-      ...(originState ? { originStateCode: originState } : {}),
-      ...(destinationState ? { destinationStateCode: destinationState } : {}),
+      stops,
       hasPermit,
       ...(hasPermit ? { permitState: permitState.trim().toUpperCase() } : {}),
       firearmType,
@@ -136,20 +106,12 @@ export default function TripForm({ onSubmit, initial }: Props) {
     <form className="trip-form" onSubmit={handleSubmit} noValidate>
       <h2 className="trip-form__title">Trip details</h2>
 
-      <div className="form-grid">
-        <AddressAutocomplete
-          label="Origin"
-          value={origin}
-          onChange={handleOriginChange}
-          placeholder="Start typing a city or address"
-        />
-        <AddressAutocomplete
-          label="Destination"
-          value={destination}
-          onChange={handleDestinationChange}
-          placeholder="Start typing a city or address"
-        />
+      <fieldset className="fieldset">
+        <legend>Stops · drag to reorder</legend>
+        <StopList stops={stops} onChange={setStops} />
+      </fieldset>
 
+      <div className="form-grid">
         <label className="field">
           <span>Has carry permit?</span>
           <select value={hasPermit ? 'yes' : 'no'} onChange={(e) => setHasPermit(e.target.value === 'yes')}>

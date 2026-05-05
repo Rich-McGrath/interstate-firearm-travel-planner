@@ -51,9 +51,9 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   )
   mapboxUrl.searchParams.set('access_token', env.MAPBOX_TOKEN)
   mapboxUrl.searchParams.set('country', 'US')
-  mapboxUrl.searchParams.set('types', 'place,locality,address,postcode')
+  mapboxUrl.searchParams.set('types', 'place,locality,neighborhood,address,postcode,poi')
   mapboxUrl.searchParams.set('autocomplete', 'true')
-  mapboxUrl.searchParams.set('limit', '5')
+  mapboxUrl.searchParams.set('limit', '6')
 
   const resp = await fetch(mapboxUrl.toString(), {
     cf: { cacheTtl: 60, cacheEverything: true },

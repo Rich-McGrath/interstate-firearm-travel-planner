@@ -963,6 +963,190 @@ p { margin: 0 0 0.8em; color: var(--cream-1); }
 }
 
 /* =====================================================================
+   Stop list (drag-reorderable trip stops)
+   ===================================================================== */
+
+.stop-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.stop-list__items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  position: relative;
+}
+
+/* Connecting line between stops */
+.stop-list__items::before {
+  content: '';
+  position: absolute;
+  left: 22px;
+  top: 18px;
+  bottom: 18px;
+  width: 1px;
+  background: repeating-linear-gradient(
+    to bottom,
+    var(--ink-rule-2) 0,
+    var(--ink-rule-2) 4px,
+    transparent 4px,
+    transparent 8px
+  );
+  z-index: 0;
+}
+
+.stop-row {
+  display: grid;
+  grid-template-columns: auto auto 1fr auto;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.55rem 0.65rem;
+  background: var(--ink-3);
+  border: 1px solid var(--ink-rule);
+  border-radius: var(--radius);
+  position: relative;
+  z-index: 1;
+  transition: border-color 0.15s, background 0.15s, opacity 0.15s, transform 0.15s;
+}
+
+.stop-row.is-dragging {
+  opacity: 0.4;
+}
+
+.stop-row.is-drag-over {
+  border-color: var(--amber);
+  background: linear-gradient(135deg, var(--ink-3), var(--ink-2));
+  box-shadow: 0 0 0 2px var(--amber-soft);
+  transform: translateY(-1px);
+}
+
+.stop-row__handle {
+  cursor: grab;
+  color: var(--cream-3);
+  font-size: 0.85rem;
+  letter-spacing: -0.1em;
+  padding: 0.2rem 0.3rem;
+  user-select: none;
+  border-radius: 2px;
+}
+
+.stop-row__handle:hover {
+  color: var(--amber);
+  background: var(--amber-soft);
+}
+
+.stop-row.is-dragging .stop-row__handle {
+  cursor: grabbing;
+}
+
+.stop-row__role {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--cream-2);
+  background: var(--ink-1);
+  padding: 0.3rem 0.55rem;
+  border-radius: 2px;
+  border: 1px solid var(--ink-rule);
+  white-space: nowrap;
+  font-weight: 500;
+  min-width: 90px;
+  text-align: center;
+}
+
+.stop-row:first-child .stop-row__role {
+  color: var(--risk-low);
+  border-color: var(--risk-low-line);
+  background: var(--risk-low-bg);
+}
+
+.stop-row:last-child .stop-row__role {
+  color: var(--amber);
+  border-color: var(--amber-line);
+  background: var(--amber-soft);
+}
+
+.stop-row__field {
+  min-width: 0;
+}
+
+.stop-row__field .field {
+  margin: 0;
+}
+
+.stop-row__field input {
+  background: var(--ink-2);
+  border-color: var(--ink-rule);
+}
+
+.stop-row__controls {
+  display: flex;
+  gap: 0.25rem;
+  flex-shrink: 0;
+}
+
+.icon-btn {
+  background: transparent;
+  border: 1px solid var(--ink-rule);
+  color: var(--cream-1);
+  width: 28px;
+  height: 28px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--mono);
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.icon-btn:hover:not(:disabled) {
+  background: var(--ink-2);
+  border-color: var(--ink-rule-2);
+  color: var(--cream-0);
+}
+
+.icon-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.icon-btn--danger:hover:not(:disabled) {
+  background: var(--risk-high-bg);
+  border-color: var(--risk-high-line);
+  color: var(--risk-high);
+}
+
+.stop-list__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  margin-top: 0.35rem;
+}
+
+@media (max-width: 600px) {
+  .stop-row {
+    grid-template-columns: auto 1fr;
+    grid-template-areas:
+      'role role'
+      'handle field'
+      'controls controls';
+    gap: 0.4rem;
+  }
+  .stop-row__role { grid-area: role; min-width: 0; justify-self: start; }
+  .stop-row__handle { grid-area: handle; align-self: center; }
+  .stop-row__field { grid-area: field; }
+  .stop-row__controls { grid-area: controls; justify-content: flex-end; }
+  .stop-list__items::before { display: none; }
+}
+
+/* =====================================================================
    Mobile
    ===================================================================== */
 

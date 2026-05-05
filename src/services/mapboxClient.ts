@@ -24,16 +24,12 @@ export async function geocode(query: string, signal?: AbortSignal): Promise<Geoc
 }
 
 export async function getDirections(
-  from: { lng: number; lat: number },
-  to: { lng: number; lat: number },
+  stops: { lng: number; lat: number }[],
   signal?: AbortSignal
 ): Promise<DirectionsRoute[]> {
-  const params = new URLSearchParams({
-    fromLng: String(from.lng),
-    fromLat: String(from.lat),
-    toLng: String(to.lng),
-    toLat: String(to.lat),
-  })
+  if (stops.length < 2) throw new Error('At least 2 stops required')
+  const coords = stops.map((s) => `${s.lng},${s.lat}`).join(';')
+  const params = new URLSearchParams({ coords })
   const resp = await fetch(`/api/directions?${params.toString()}`, { signal })
   if (!resp.ok) throw new Error(`directions failed: ${resp.status}`)
   const data = (await resp.json()) as { routes?: DirectionsRoute[] }
