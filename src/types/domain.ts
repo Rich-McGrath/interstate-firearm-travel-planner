@@ -19,6 +19,18 @@ export type TransportItem =
 export type RecognitionStatus = 'yes' | 'limited' | 'no' | 'manual_review'
 export type RiskLevel = 'low' | 'caution' | 'high' | 'manual_review'
 export type SourceType = 'official' | 'secondary' | 'missing'
+
+export interface SourceRef {
+  url: string
+  type: SourceType
+  // Short human-readable name shown next to the link, e.g. "Texas DPS",
+  // "MA AG Office". Falls back to a generic "source" if absent.
+  label?: string
+  // Optional verbatim quote from the source supporting the claim. Useful
+  // when revisiting an entry months later.
+  quotedText?: string
+}
+
 export type StopCategory = 'gas' | 'food' | 'gas_food'
 export type StopLabel = 'recommended' | 'better_traffic' | 'manual_review'
 export type DutyToInform =
@@ -116,9 +128,8 @@ export interface StateLawProfile {
   suppressorRiskNote?: string
   nfaRiskNote?: string
   notes: string[]
-  sourceType: SourceType
-  sourceUrl: string
-  lastVerified: string
+  source: SourceRef
+  lastVerified: string // ISO date — when YOU last verified this entry
   confidence: 'high' | 'medium' | 'low'
 }
 

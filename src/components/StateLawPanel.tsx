@@ -8,6 +8,8 @@ import {
   formatDutyToInform,
   formatRecognitionStatus,
   formatRiskLevel,
+  formatVerifiedDate,
+  isStale,
   recognitionClassName,
   riskClassName,
 } from '../utils/format'
@@ -102,6 +104,28 @@ export default function StateLawPanel({
                     <li key={i}>{note}</li>
                   ))}
                 </ul>
+              )}
+
+              {profile && (
+                <footer className="state-card__provenance">
+                  <span className="state-card__verified mono">
+                    Verified {formatVerifiedDate(profile.lastVerified)}
+                    {' · '}
+                    <a
+                      href={profile.source.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {profile.source.label ?? 'source'}
+                    </a>
+                    {profile.source.type === 'secondary' && ' (secondary)'}
+                  </span>
+                  {isStale(profile.lastVerified) && (
+                    <span className="state-card__stale mono" title="Verification is over a year old">
+                      ⚠ Review recommended
+                    </span>
+                  )}
+                </footer>
               )}
             </article>
           )

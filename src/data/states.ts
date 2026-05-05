@@ -1,4 +1,9 @@
-import type { DutyToInform, RecognitionStatus, StateLawProfile } from '../types/domain'
+import type {
+  DutyToInform,
+  RecognitionStatus,
+  SourceRef,
+  StateLawProfile,
+} from '../types/domain'
 
 // SEED DATA. Illustrative only. Every entry is a coarse 3-tier
 // classification of the state's carry-recognition posture, not a
@@ -6,6 +11,13 @@ import type { DutyToInform, RecognitionStatus, StateLawProfile } from '../types/
 // only resident permits, only enhanced permits, only specific issuing
 // states, etc.). Replace with a vetted, current dataset before any
 // real-world use.
+//
+// To update an entry: change the values, bump `lastVerified` to today's
+// ISO date, and update `source` to point at the page you actually
+// consulted. States without explicit lastVerified/source fall back to
+// the module-level DEFAULT_VERIFIED and DEFAULT_SOURCE — which is fine
+// for initial seeding but should be treated as "not yet individually
+// verified."
 
 type CarryPolicy =
   | 'broad' // permissive — generally recognizes most other state permits
@@ -25,9 +37,23 @@ interface StateDef {
   suppressorRiskNote?: string
   nfaRiskNote?: string
   notes: string[]
+  // Per-state provenance — recommended to set whenever you touch the
+  // entry. Falls back to module defaults if omitted.
+  lastVerified?: string // ISO date
+  source?: SourceRef
+  confidence?: 'high' | 'medium' | 'low'
 }
 
-const SEED_VERIFIED = '2025-01-01'
+// When seed data was first compiled. Entries that haven't been
+// individually verified inherit this date. Once you start updating
+// per-state, prefer setting lastVerified on each entry directly.
+const DEFAULT_VERIFIED = '2025-12-01'
+const DEFAULT_CONFIDENCE: 'high' | 'medium' | 'low' = 'medium'
+const DEFAULT_SOURCE: SourceRef = {
+  url: 'https://www.usconcealedcarry.com/resources/ccw_reciprocity_map/',
+  type: 'secondary',
+  label: 'seed dataset',
+}
 
 // All 50 states + DC. Policy assignments are conservative approximations.
 const STATE_DEFS: Record<string, StateDef> = {
@@ -92,7 +118,19 @@ const STATE_DEFS: Record<string, StateDef> = {
       'D.C. has its own carry licensing process that is not transferable.',
     ],
   },
-  FL: { name: 'Florida', policy: 'broad', dutyToInform: 'no_duty', notes: [] },
+  FL: {
+    name: 'Florida',
+    policy: 'broad',
+    dutyToInform: 'no_duty',
+    notes: [],
+    lastVerified: '2025-12-01',
+    confidence: 'high',
+    source: {
+      url: 'https://www.fdacs.gov/Consumer-Resources/Concealed-Weapon-License',
+      type: 'official',
+      label: 'FL DACS',
+    },
+  },
   GA: { name: 'Georgia', policy: 'broad', dutyToInform: 'no_duty', notes: ['Constitutional carry.'] },
   HI: {
     name: 'Hawaii',
@@ -147,6 +185,13 @@ const STATE_DEFS: Record<string, StateDef> = {
       'Massachusetts does not recognize out-of-state concealed carry permits for non-residents.',
       'Magazine and assault-weapon definitions apply.',
     ],
+    lastVerified: '2025-12-01',
+    confidence: 'medium',
+    source: {
+      url: 'https://www.mass.gov/topics/firearms-laws-licensing',
+      type: 'official',
+      label: 'Mass.gov',
+    },
   },
   MI: { name: 'Michigan', policy: 'limited', dutyToInform: 'must_inform', notes: ['Recognition is limited to specific issuing states.'] },
   MN: {
@@ -190,6 +235,13 @@ const STATE_DEFS: Record<string, StateDef> = {
       'New York generally does not recognize out-of-state concealed carry permits.',
       'Magazine and assault-weapon definitions apply; SAFE Act restrictions in effect.',
     ],
+    lastVerified: '2025-12-01',
+    confidence: 'medium',
+    source: {
+      url: 'https://troopers.ny.gov/firearms',
+      type: 'official',
+      label: 'NY State Police',
+    },
   },
   NC: { name: 'North Carolina', policy: 'broad', dutyToInform: 'must_inform', notes: [] },
   ND: { name: 'North Dakota', policy: 'broad', dutyToInform: 'no_duty', notes: ['Constitutional carry for residents.'] },
@@ -221,7 +273,22 @@ const STATE_DEFS: Record<string, StateDef> = {
   SC: { name: 'South Carolina', policy: 'broad', dutyToInform: 'must_inform', notes: [] },
   SD: { name: 'South Dakota', policy: 'broad', dutyToInform: 'no_duty', notes: ['Constitutional carry.'] },
   TN: { name: 'Tennessee', policy: 'broad', dutyToInform: 'no_duty', notes: ['Constitutional carry.'] },
-  TX: { name: 'Texas', policy: 'broad', dutyToInform: 'no_duty', notes: ['Constitutional carry; License to Carry available for reciprocity.'] },
+  TX: {
+    name: 'Texas',
+    policy: 'broad',
+    dutyToInform: 'no_duty',
+    notes: [
+      'Constitutional carry; License to Carry available for reciprocity.',
+      'No statutory duty to inform law enforcement of carry status as of 2017 (SB 1849).',
+    ],
+    lastVerified: '2025-12-01',
+    confidence: 'high',
+    source: {
+      url: 'https://www.dps.texas.gov/section/handgun-licensing',
+      type: 'official',
+      label: 'TX DPS',
+    },
+  },
   UT: { name: 'Utah', policy: 'broad', dutyToInform: 'no_duty', notes: ['Constitutional carry.'] },
   VT: {
     name: 'Vermont',
@@ -294,10 +361,9 @@ function toProfile(code: string, def: StateDef): StateLawProfile {
     ...(def.suppressorRiskNote ? { suppressorRiskNote: def.suppressorRiskNote } : {}),
     ...(def.nfaRiskNote ? { nfaRiskNote: def.nfaRiskNote } : {}),
     notes: def.notes,
-    sourceType: 'secondary',
-    sourceUrl: 'https://www.usconcealedcarry.com/resources/ccw_reciprocity_map/',
-    lastVerified: SEED_VERIFIED,
-    confidence: 'medium',
+    source: def.source ?? DEFAULT_SOURCE,
+    lastVerified: def.lastVerified ?? DEFAULT_VERIFIED,
+    confidence: def.confidence ?? DEFAULT_CONFIDENCE,
   }
 }
 

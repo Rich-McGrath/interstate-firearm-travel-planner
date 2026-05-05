@@ -99,3 +99,25 @@ export function dutyShortLabel(d: DutyToInform): string {
 export function dutyClassName(d: DutyToInform): string {
   return `duty-${d}`
 }
+
+// ---------------------------------------------------------------------------
+// Verification freshness helpers
+// ---------------------------------------------------------------------------
+
+const STALE_MONTHS = 12
+
+export function formatVerifiedDate(iso: string): string {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return iso
+  return d.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
+}
+
+export function monthsSince(iso: string, now: Date = new Date()): number {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return Number.POSITIVE_INFINITY
+  return (now.getFullYear() - d.getFullYear()) * 12 + (now.getMonth() - d.getMonth())
+}
+
+export function isStale(iso: string, threshold: number = STALE_MONTHS): boolean {
+  return monthsSince(iso) >= threshold
+}
