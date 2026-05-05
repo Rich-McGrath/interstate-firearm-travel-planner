@@ -7,7 +7,7 @@ import type {
 } from '../types/domain'
 import StopList from './StopList'
 import StateAutocomplete from './StateAutocomplete'
-import NfaReminder from './NfaReminder'
+import RegulatoryReminder from './RegulatoryReminder'
 
 interface Props {
   onSubmit: (trip: TripInput) => void
@@ -20,6 +20,8 @@ const ALL_TRANSPORT_ITEMS: { value: TransportItem; label: string }[] = [
   { value: 'handgun', label: 'Handgun' },
   { value: 'rifle', label: 'Rifle' },
   { value: 'ar_style_rifle', label: 'AR-style rifle' },
+  { value: 'pistol_brace', label: 'Pistol brace' },
+  { value: 'frt', label: 'Forced reset trigger (FRT)' },
   { value: 'nfa_item', label: 'NFA item' },
   { value: 'suppressor', label: 'Suppressor' },
   { value: 'other', label: 'Other' },
@@ -167,7 +169,7 @@ export default function TripForm({ onSubmit, initial }: Props) {
         </div>
       </fieldset>
 
-      <NfaReminder items={items} />
+      <RegulatoryReminder items={items} />
 
       <fieldset className="fieldset">
         <legend>Transport conditions</legend>

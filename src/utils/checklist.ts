@@ -42,6 +42,21 @@ export function generateChecklist(input: ChecklistInput): string[] {
     )
   }
 
+  if (trip.transportedItems.includes('pistol_brace')) {
+    items.push(
+      'Verify the current federal status of the ATF pistol-brace rule (vacated post-Mock v. Garland as of last verification) and any state-level brace restrictions for every state on the route.'
+    )
+  }
+
+  if (trip.transportedItems.includes('frt')) {
+    items.push(
+      'Verify the current legal status of the specific forced-reset-trigger product and the controlling federal classification before transport.'
+    )
+    items.push(
+      'If the FRT is treated as a machine gun under current rules, Form 5320.20 generally applies — submit and receive approval before departure.'
+    )
+  }
+
   if (trip.transportedItems.includes('suppressor')) {
     items.push('Manually review suppressor possession rules for every state crossed.')
   }

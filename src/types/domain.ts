@@ -10,6 +10,8 @@ export type TransportItem =
   | 'handgun'
   | 'rifle'
   | 'ar_style_rifle'
+  | 'pistol_brace'
+  | 'frt'
   | 'nfa_item'
   | 'suppressor'
   | 'other'

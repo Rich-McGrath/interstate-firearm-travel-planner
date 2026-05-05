@@ -87,6 +87,18 @@ describe('evaluateFopa', () => {
     expect(out.qualifiesPotentially).toBe('manual_review')
   })
 
+  it('returns manual_review when a pistol brace is in the transport list', () => {
+    const out = evaluateFopa(baseTrip({ transportedItems: ['handgun', 'pistol_brace'] }))
+    expect(out.qualifiesPotentially).toBe('manual_review')
+    expect(out.warnings.some((w) => /brace/i.test(w))).toBe(true)
+  })
+
+  it('returns manual_review when an FRT is in the transport list', () => {
+    const out = evaluateFopa(baseTrip({ transportedItems: ['handgun', 'frt'] }))
+    expect(out.qualifiesPotentially).toBe('manual_review')
+    expect(out.warnings.some((w) => /forced reset|frt/i.test(w))).toBe(true)
+  })
+
   it('handles trips with intermediate waypoints', () => {
     const trip = baseTrip({
       stops: [

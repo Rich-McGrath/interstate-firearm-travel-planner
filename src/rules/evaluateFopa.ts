@@ -95,10 +95,28 @@ export function evaluateFopa(trip: TripInput): FopaAnalysis {
     }
   }
 
-  // NFA / suppressor flag
-  if (trip.transportedItems.includes('nfa_item') || trip.transportedItems.includes('suppressor')) {
+  // NFA / suppressor / brace / FRT — items with unsettled or contested
+  // federal status push the trip to manual_review. Even when § 926A might
+  // apply on its own terms, the underlying classification of the item
+  // affects what "lawful possession" at origin and destination means.
+  if (
+    trip.transportedItems.includes('nfa_item') ||
+    trip.transportedItems.includes('suppressor')
+  ) {
     warnings.push(
       'NFA item or suppressor in transport list — federal § 926A protection for these items is not guaranteed and state restrictions vary widely. Manual review required.'
+    )
+    if (qualifiesPotentially === true) qualifiesPotentially = 'manual_review'
+  }
+  if (trip.transportedItems.includes('pistol_brace')) {
+    warnings.push(
+      'Pistol brace in transport list — federal classification has been actively litigated and some states restrict braces independently. Manual review required.'
+    )
+    if (qualifiesPotentially === true) qualifiesPotentially = 'manual_review'
+  }
+  if (trip.transportedItems.includes('frt')) {
+    warnings.push(
+      'Forced reset trigger in transport list — ATF classifies certain FRTs as machine guns and the legal status varies by product and jurisdiction. Manual review required.'
     )
     if (qualifiesPotentially === true) qualifiesPotentially = 'manual_review'
   }
