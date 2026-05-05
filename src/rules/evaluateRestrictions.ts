@@ -83,6 +83,21 @@ export function evaluateRestrictions(input: RestrictionsInput): RestrictionResul
         detail: `${stateName}: ${profile.nfaRiskNote}`,
       })
     }
+
+    // Ammunition-specific restrictions (NJ hollow-points, NY CCIA, etc.)
+    if (
+      trip.transportedItems.includes('ammunition') &&
+      profile.ammunitionRestrictions
+    ) {
+      for (const r of profile.ammunitionRestrictions) {
+        results.push({
+          stateCode,
+          level: r.level,
+          title: 'Ammunition restriction',
+          detail: `${stateName}: ${r.detail}`,
+        })
+      }
+    }
   }
 
   return results

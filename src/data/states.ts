@@ -36,6 +36,7 @@ interface StateDef {
   hasSpecialTransportRules?: boolean
   suppressorRiskNote?: string
   nfaRiskNote?: string
+  ammunitionRestrictions?: { detail: string; level: 'low' | 'caution' | 'high' | 'manual_review' }[]
   notes: string[]
   // Per-state provenance — recommended to set whenever you touch the
   // entry. Falls back to module defaults if omitted.
@@ -69,6 +70,13 @@ const STATE_DEFS: Record<string, StateDef> = {
     hasAssaultWeaponBan: true,
     hasSpecialTransportRules: true,
     suppressorRiskNote: 'Civilian suppressor possession is generally prohibited.',
+    ammunitionRestrictions: [
+      {
+        level: 'high',
+        detail:
+          'Ammunition purchase requires background-check / eligibility verification; importation by individuals is generally restricted. Manual review required.',
+      },
+    ],
     notes: [
       'California generally does not recognize out-of-state concealed carry permits.',
       'Magazine and assault-weapon definitions apply.',
@@ -149,6 +157,13 @@ const STATE_DEFS: Record<string, StateDef> = {
     magazineLimit: 10,
     hasAssaultWeaponBan: true,
     hasSpecialTransportRules: true,
+    ammunitionRestrictions: [
+      {
+        level: 'caution',
+        detail:
+          'Possession of ammunition by non-residents while present in Illinois may implicate FOID-card requirements. Manual review required.',
+      },
+    ],
     notes: [
       'Illinois generally does not recognize out-of-state permits for non-residents.',
       'Firearm Owner Identification (FOID) requirements may apply to possession.',
@@ -215,9 +230,15 @@ const STATE_DEFS: Record<string, StateDef> = {
     hasSpecialTransportRules: true,
     suppressorRiskNote: 'Civilian suppressor possession is generally prohibited.',
     nfaRiskNote: 'Many NFA items face additional state restrictions.',
+    ammunitionRestrictions: [
+      {
+        level: 'high',
+        detail:
+          'Hollow-point ammunition possession outside the home, range, or direct transport between them is generally prohibited. Manual review required.',
+      },
+    ],
     notes: [
       'New Jersey generally does not recognize out-of-state concealed carry permits.',
-      'Hollow-point ammunition has additional restrictions.',
       'Strict transport conditions apply.',
     ],
   },
@@ -231,6 +252,13 @@ const STATE_DEFS: Record<string, StateDef> = {
     hasSpecialTransportRules: true,
     suppressorRiskNote: 'Civilian suppressor possession is generally prohibited.',
     nfaRiskNote: 'NFA items subject to additional state restrictions.',
+    ammunitionRestrictions: [
+      {
+        level: 'caution',
+        detail:
+          'Ammunition purchases require background-check processes per state law (CCIA). Possession during transport is generally permitted but verify current rules.',
+      },
+    ],
     notes: [
       'New York generally does not recognize out-of-state concealed carry permits.',
       'Magazine and assault-weapon definitions apply; SAFE Act restrictions in effect.',
@@ -360,6 +388,9 @@ function toProfile(code: string, def: StateDef): StateLawProfile {
       : {}),
     ...(def.suppressorRiskNote ? { suppressorRiskNote: def.suppressorRiskNote } : {}),
     ...(def.nfaRiskNote ? { nfaRiskNote: def.nfaRiskNote } : {}),
+    ...(def.ammunitionRestrictions
+      ? { ammunitionRestrictions: def.ammunitionRestrictions }
+      : {}),
     notes: def.notes,
     source: def.source ?? DEFAULT_SOURCE,
     lastVerified: def.lastVerified ?? DEFAULT_VERIFIED,

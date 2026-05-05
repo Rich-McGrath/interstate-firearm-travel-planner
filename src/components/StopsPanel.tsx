@@ -3,15 +3,18 @@ import type {
   StopFilters,
   StopRecommendation,
 } from '../types/domain'
+import type { EnrichedStop } from '../rules/enrichStops'
 import { scoreStops } from '../rules/scoreStops'
 import {
+  dutyClassName,
   formatDistance,
+  formatDutyToInform,
   formatStopLabel,
   stopLabelClassName,
 } from '../utils/format'
 
 interface Props {
-  stops: StopRecommendation[]
+  stops: EnrichedStop[]
   loading?: boolean
   selectedStopIds: string[]
   onToggleSelect: (id: string) => void
@@ -30,7 +33,12 @@ export default function StopsPanel({
     sortBy: 'score',
   })
 
-  const scored = useMemo(() => scoreStops(stops, filters), [stops, filters])
+  // scoreStops takes the base StopRecommendation; the enriched fields
+  // are already on each stop and pass through unchanged.
+  const scored = useMemo(
+    () => scoreStops(stops as StopRecommendation[], filters) as EnrichedStop[],
+    [stops, filters]
+  )
 
   return (
     <section className="card">
@@ -128,6 +136,22 @@ export default function StopsPanel({
                 )}
                 <span>{stop.category.replace('_', ' + ')}</span>
               </div>
+
+              {stop.contextStateCode && (
+                <div className="stop-card__context">
+                  <span className="stop-card__context-state mono">
+                    in {stop.contextStateCode}
+                  </span>
+                  {stop.contextDuty && stop.contextDuty !== 'no_duty' && (
+                    <span className={`badge ${dutyClassName(stop.contextDuty)}`}>
+                      {formatDutyToInform(stop.contextDuty)}
+                    </span>
+                  )}
+                  {stop.contextRestrictive && (
+                    <span className="badge risk-caution">Restrictive state</span>
+                  )}
+                </div>
+              )}
 
               {stop.reasons.length > 0 && (
                 <ul className="chip-list">

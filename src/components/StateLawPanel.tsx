@@ -13,6 +13,7 @@ import {
   recognitionClassName,
   riskClassName,
 } from '../utils/format'
+import { useTrustMode } from '../services/trustMode'
 
 interface Props {
   reciprocity: ReciprocityResult[]
@@ -25,6 +26,9 @@ export default function StateLawPanel({
   restrictions,
   routeStates,
 }: Props) {
+  const { mode } = useTrustMode()
+  const simple = mode === 'simple'
+
   return (
     <section className="card">
       <header className="card__header">
@@ -98,7 +102,7 @@ export default function StateLawPanel({
                 </ul>
               )}
 
-              {profile && profile.notes.length > 0 && (
+              {!simple && profile && profile.notes.length > 0 && (
                 <ul className="state-notes">
                   {profile.notes.map((note, i) => (
                     <li key={i}>{note}</li>
@@ -106,7 +110,7 @@ export default function StateLawPanel({
                 </ul>
               )}
 
-              {profile && (
+              {!simple && profile && (
                 <footer className="state-card__provenance">
                   <span className="state-card__verified mono">
                     Verified {formatVerifiedDate(profile.lastVerified)}

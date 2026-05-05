@@ -1589,12 +1589,290 @@ p { margin: 0 0 0.8em; color: var(--cream-1); }
 }
 
 /* =====================================================================
+   Brand-row controls (recent trips + trust toggle in header)
+   ===================================================================== */
+
+.app__brand {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.app__brand-text { flex: 1; min-width: 0; }
+
+.app__brand-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-shrink: 0;
+}
+
+/* =====================================================================
+   Trust mode toggle
+   ===================================================================== */
+
+.trust-toggle {
+  display: inline-flex;
+  border: 1px solid var(--ink-rule-2);
+  border-radius: 3px;
+  overflow: hidden;
+  background: var(--ink-2);
+}
+
+.trust-toggle__btn {
+  appearance: none;
+  background: transparent;
+  border: none;
+  color: var(--cream-3);
+  font-family: var(--mono);
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 0.42rem 0.85rem;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.trust-toggle__btn:hover { color: var(--cream-1); }
+
+.trust-toggle__btn.is-active {
+  background: var(--amber-bg);
+  color: var(--amber);
+}
+
+.trust-toggle__btn + .trust-toggle__btn {
+  border-left: 1px solid var(--ink-rule-2);
+}
+
+/* =====================================================================
+   Recent trips menu (header dropdown)
+   ===================================================================== */
+
+.recent-trips {
+  position: relative;
+}
+
+.recent-trips__menu {
+  position: absolute;
+  top: calc(100% + 0.4rem);
+  right: 0;
+  min-width: 280px;
+  max-width: 360px;
+  list-style: none;
+  margin: 0;
+  padding: 0.35rem;
+  background: var(--ink-2);
+  border: 1px solid var(--ink-rule-2);
+  border-radius: var(--radius);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.55);
+  z-index: 50;
+}
+
+.recent-trips__item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.15rem;
+  border-radius: 3px;
+}
+
+.recent-trips__item:hover { background: var(--ink-3); }
+
+.recent-trips__load {
+  flex: 1;
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--cream-1);
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.5rem 0.6rem;
+  cursor: pointer;
+  border-radius: 3px;
+}
+
+.recent-trips__label {
+  font-size: 0.92rem;
+  color: var(--cream-1);
+}
+
+.recent-trips__date {
+  color: var(--cream-3);
+}
+
+/* =====================================================================
+   Vehicle profiles (inside Transport conditions fieldset)
+   ===================================================================== */
+
+.vehicle-profiles {
+  margin-bottom: 1rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px dashed var(--ink-rule);
+}
+
+.vehicle-profiles__row {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.7rem;
+  flex-wrap: wrap;
+}
+
+.vehicle-profiles__row .field { flex: 1; min-width: 220px; margin: 0; }
+
+.vehicle-profiles__manager {
+  margin-top: 0.85rem;
+  padding: 0.85rem;
+  background: var(--ink-1);
+  border: 1px solid var(--ink-rule);
+  border-radius: var(--radius);
+}
+
+.vehicle-profiles__save-row {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.85rem;
+}
+
+.vehicle-profiles__save-row input {
+  flex: 1;
+  min-width: 180px;
+  background: var(--ink-2);
+  color: var(--cream-1);
+  border: 1px solid var(--ink-rule-2);
+  border-radius: 3px;
+  padding: 0.5rem 0.7rem;
+  font-family: inherit;
+  font-size: 0.92rem;
+}
+
+.vehicle-profiles__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.vehicle-profiles__list li {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.4rem 0.55rem;
+  background: var(--ink-2);
+  border: 1px solid var(--ink-rule);
+  border-radius: 3px;
+  font-size: 0.88rem;
+}
+
+.vehicle-profiles__name {
+  flex: 1;
+  color: var(--cream-1);
+  font-weight: 500;
+}
+
+.vehicle-profiles__settings { color: var(--cream-3); }
+
+/* Field that lays out label and control inline (used by vehicle picker) */
+.field--inline {
+  display: flex;
+  flex-direction: column;
+}
+
+.field--inline > span {
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--cream-3);
+  margin-bottom: 0.3rem;
+  font-family: var(--mono);
+}
+
+.field--inline > select {
+  background: var(--ink-2);
+  color: var(--cream-1);
+  border: 1px solid var(--ink-rule-2);
+  border-radius: 3px;
+  padding: 0.5rem 0.7rem;
+  font-family: inherit;
+  font-size: 0.92rem;
+}
+
+/* =====================================================================
+   Smaller-footprint button + danger icon button
+   ===================================================================== */
+
+.btn--small {
+  font-size: 0.78rem;
+  padding: 0.42rem 0.85rem;
+}
+
+.icon-btn {
+  appearance: none;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--cream-3);
+  width: 1.85rem;
+  height: 1.85rem;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 0.95rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s;
+}
+
+.icon-btn:hover {
+  background: var(--ink-3);
+  color: var(--cream-1);
+}
+
+.icon-btn--danger:hover {
+  background: var(--risk-high-bg);
+  color: var(--risk-high);
+  border-color: var(--risk-high-line);
+}
+
+/* =====================================================================
+   Per-stop legal hot-spot context
+   ===================================================================== */
+
+.stop-card__context {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px dashed var(--ink-rule);
+}
+
+.stop-card__context-state {
+  font-size: 0.72rem;
+  color: var(--amber-2);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 0.18rem 0.5rem;
+  background: var(--amber-bg);
+  border: 1px solid var(--amber-line);
+  border-radius: 2px;
+}
+
+
+
+/* =====================================================================
    Mobile
    ===================================================================== */
 
 @media (max-width: 540px) {
   .app__header { padding: 1.25rem 1rem; }
   .app__brand { flex-direction: column; align-items: flex-start; gap: 0.7rem; }
+  .app__brand-controls { width: 100%; justify-content: space-between; }
   .app__main { padding: 1rem; gap: 1rem; }
   .card, .trip-form { padding: 1.1rem; }
+  .recent-trips__menu { right: auto; left: 0; }
 }

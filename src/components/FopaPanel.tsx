@@ -1,4 +1,5 @@
 import type { FopaAnalysis } from '../types/domain'
+import { useTrustMode } from '../services/trustMode'
 
 interface Props {
   fopa: FopaAnalysis
@@ -11,7 +12,10 @@ function statusLabel(s: FopaAnalysis['qualifiesPotentially']) {
 }
 
 export default function FopaPanel({ fopa }: Props) {
+  const { mode } = useTrustMode()
   const status = statusLabel(fopa.qualifiesPotentially)
+  const simple = mode === 'simple'
+
   return (
     <section className="card">
       <header className="card__header">
@@ -19,25 +23,27 @@ export default function FopaPanel({ fopa }: Props) {
         <span className={`badge ${status.cls}`}>{status.text}</span>
       </header>
 
-      <div className="card__columns">
-        <div>
-          <h3>Reasons</h3>
-          <ul className="bullet-list">
-            {fopa.reasons.map((r) => (
-              <li key={r}>{r}</li>
-            ))}
-          </ul>
-        </div>
+      {!simple && (
+        <div className="card__columns">
+          <div>
+            <h3>Reasons</h3>
+            <ul className="bullet-list">
+              {fopa.reasons.map((r) => (
+                <li key={r}>{r}</li>
+              ))}
+            </ul>
+          </div>
 
-        <div>
-          <h3>Required conditions</h3>
-          <ul className="bullet-list">
-            {fopa.requiredConditions.map((r) => (
-              <li key={r}>{r}</li>
-            ))}
-          </ul>
+          <div>
+            <h3>Required conditions</h3>
+            <ul className="bullet-list">
+              {fopa.requiredConditions.map((r) => (
+                <li key={r}>{r}</li>
+              ))}
+            </ul>
+          </div>
         </div>
-      </div>
+      )}
 
       {fopa.warnings.length > 0 && (
         <div className="card__section">

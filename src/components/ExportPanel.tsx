@@ -1,25 +1,31 @@
-import type { StopRecommendation, TripStop } from '../types/domain'
+import { useState } from 'react'
+import type { StopRecommendation, TripInput, TripStop } from '../types/domain'
 import {
   buildAppleMapsUrl,
   buildGoogleMapsUrl,
   buildWazeUrl,
 } from '../services/exportMaps'
+import { buildShareUrl } from '../services/share'
 
 interface Props {
+  trip: TripInput
   origin: string
   destination: string
-  userWaypoints: TripStop[] // stops the user added between origin and destination
-  suggestedStops: StopRecommendation[] // stops user picked from the suggestion panel
+  userWaypoints: TripStop[]
+  suggestedStops: StopRecommendation[]
   checklist: string[]
 }
 
 export default function ExportPanel({
+  trip,
   origin,
   destination,
   userWaypoints,
   suggestedStops,
   checklist,
 }: Props) {
+  const [copied, setCopied] = useState(false)
+
   // Combine user-planned waypoints with selected suggested refueling stops
   // for the map exports. User stops come first; suggested stops are
   // appended in the order selected.
@@ -42,6 +48,20 @@ export default function ExportPanel({
   const appleUrl = buildAppleMapsUrl(target)
   const wazeUrl = buildWazeUrl(target, allWaypoints[0])
 
+  async function handleCopyShareLink() {
+    const url = buildShareUrl(trip)
+    try {
+      await navigator.clipboard.writeText(url)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2500)
+    } catch {
+      // Fallback: select the text via prompt() if clipboard API fails
+      // (older browsers, insecure contexts). Not ideal but better than
+      // silently failing.
+      window.prompt('Copy this share link:', url)
+    }
+  }
+
   return (
     <section className="card">
       <header className="card__header">
@@ -63,13 +83,23 @@ export default function ExportPanel({
         <a className="btn btn--export" href={wazeUrl} target="_blank" rel="noreferrer">
           Open in Waze
         </a>
+        <button
+          type="button"
+          className="btn btn--ghost"
+          onClick={handleCopyShareLink}
+          title="Copy a shareable link to this evaluation"
+        >
+          {copied ? '✓ Link copied' : 'Copy share link'}
+        </button>
       </div>
 
       <p className="muted small">
         Note: Google Maps supports multi-stop waypoints. Apple Maps does not formally
         support multi-stop directions via URL — add stops in-app after opening. Waze
         URLs target a single destination only and will navigate to the first
-        intermediate stop, or to the final destination if none.
+        intermediate stop, or to the final destination if none. The share link encodes
+        the trip into the URL hash and contains no personal information beyond what
+        you entered.
       </p>
 
       <div className="card__section">

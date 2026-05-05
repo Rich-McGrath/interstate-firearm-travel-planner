@@ -112,6 +112,13 @@ export interface RouteOption {
   samples: RouteSampleClient[]
 }
 
+export interface AmmunitionRestriction {
+  // Free-text description of the restriction; surfaced verbatim in the UI.
+  detail: string
+  // Severity for color-coding the surfaced warning.
+  level: RiskLevel
+}
+
 export interface StateLawProfile {
   stateCode: string
   stateName: string
@@ -127,6 +134,10 @@ export interface StateLawProfile {
   hasSpecialTransportRules?: boolean
   suppressorRiskNote?: string
   nfaRiskNote?: string
+  // Ammunition-specific restrictions — NJ hollow-points, certain
+  // background-check regimes, etc. Surfaced when 'ammunition' is in the
+  // transport list.
+  ammunitionRestrictions?: AmmunitionRestriction[]
   notes: string[]
   source: SourceRef
   lastVerified: string // ISO date — when YOU last verified this entry
@@ -166,6 +177,9 @@ export interface StopRecommendation {
   isOpenNow?: boolean
   chainBrand?: boolean
   inCommercialCorridor?: boolean
+  // State the stop is in. Filled client-side by matching to the nearest
+  // route sample (which already has stateCode from /api/directions).
+  stateCode?: string
   score: number
   label: StopLabel
   reasons: string[]

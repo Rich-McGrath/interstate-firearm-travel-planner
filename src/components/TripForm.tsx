@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type {
   FirearmType,
   TransportItem,
@@ -8,6 +8,8 @@ import type {
 import StopList from './StopList'
 import StateAutocomplete from './StateAutocomplete'
 import RegulatoryReminder from './RegulatoryReminder'
+import VehicleProfilePicker from './VehicleProfilePicker'
+import type { VehicleProfile } from '../services/storage'
 
 interface Props {
   onSubmit: (trip: TripInput) => void
@@ -38,7 +40,6 @@ function defaultStops(): TripStop[] {
 
 export default function TripForm({ onSubmit, initial }: Props) {
   const [stops, setStops] = useState<TripStop[]>(initial?.stops ?? defaultStops())
-
   const [hasPermit, setHasPermit] = useState(initial?.hasPermit ?? true)
   const [permitState, setPermitState] = useState(initial?.permitState ?? 'MA')
   const [firearmType, setFirearmType] = useState<FirearmType>(initial?.firearmType ?? 'handgun')
@@ -59,6 +60,39 @@ export default function TripForm({ onSubmit, initial }: Props) {
   const [lockedContainer, setLockedContainer] = useState(initial?.lockedContainerUsed ?? true)
 
   const [errors, setErrors] = useState<string[]>([])
+
+  // When `initial` changes (e.g., user clicked a Recent Trip or share link
+  // loaded), repopulate every field so the form reflects the requested
+  // trip. Without this, useState's lazy initializer only runs once.
+  useEffect(() => {
+    if (!initial) return
+    if (initial.stops) setStops(initial.stops)
+    if (initial.hasPermit !== undefined) setHasPermit(initial.hasPermit)
+    if (initial.permitState !== undefined) setPermitState(initial.permitState)
+    if (initial.firearmType !== undefined) setFirearmType(initial.firearmType)
+    if (initial.magazineCapacity !== undefined) {
+      setMagazineCapacity(initial.magazineCapacity.toString())
+    }
+    if (initial.transportedItems) setItems(initial.transportedItems)
+    if (initial.firearmUnloaded !== undefined) setFirearmUnloaded(initial.firearmUnloaded)
+    if (initial.ammoAccessibleFromPassengerCompartment !== undefined) {
+      setAmmoAccessible(initial.ammoAccessibleFromPassengerCompartment)
+    }
+    if (initial.firearmAccessibleFromPassengerCompartment !== undefined) {
+      setFirearmAccessible(initial.firearmAccessibleFromPassengerCompartment)
+    }
+    if (initial.vehicleHasSeparateTrunk !== undefined) {
+      setVehicleHasTrunk(initial.vehicleHasSeparateTrunk)
+    }
+    if (initial.lockedContainerUsed !== undefined) setLockedContainer(initial.lockedContainerUsed)
+  }, [initial])
+
+  function applyVehicleProfile(p: VehicleProfile) {
+    setVehicleHasTrunk(p.vehicleHasSeparateTrunk)
+    setLockedContainer(p.lockedContainerUsed)
+    setFirearmAccessible(p.firearmAccessibleFromPassengerCompartment)
+    setAmmoAccessible(p.ammoAccessibleFromPassengerCompartment)
+  }
 
   function toggleItem(item: TransportItem) {
     setItems((prev) => (prev.includes(item) ? prev.filter((i) => i !== item) : [...prev, item]))
@@ -173,6 +207,15 @@ export default function TripForm({ onSubmit, initial }: Props) {
 
       <fieldset className="fieldset">
         <legend>Transport conditions</legend>
+        <VehicleProfilePicker
+          current={{
+            vehicleHasSeparateTrunk: vehicleHasTrunk,
+            lockedContainerUsed: lockedContainer,
+            firearmAccessibleFromPassengerCompartment: firearmAccessible,
+            ammoAccessibleFromPassengerCompartment: ammoAccessible,
+          }}
+          onApply={applyVehicleProfile}
+        />
         <div className="checkbox-grid">
           <label className="checkbox">
             <input
