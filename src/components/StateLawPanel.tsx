@@ -29,15 +29,29 @@ export default function StateLawPanel({
   const { mode } = useTrustMode()
   const simple = mode === 'simple'
 
+  // Sort states by risk severity descending so users see the most
+  // consequential ones first. A state's severity is the worst of:
+  //   - Reciprocity status: 'no' (red) > 'manual_review' > 'limited' (amber) > 'yes' (green)
+  //   - Highest restriction risk level on that state ('high' > 'caution' > 'manual_review' > 'low')
+  // Ties broken by state code for deterministic ordering.
+  const sortedStates = [...routeStates].sort((aRaw, bRaw) => {
+    const a = aRaw.toUpperCase()
+    const b = bRaw.toUpperCase()
+    const aScore = stateSeverityScore(a, reciprocity, restrictions)
+    const bScore = stateSeverityScore(b, reciprocity, restrictions)
+    if (aScore !== bScore) return bScore - aScore // descending
+    return a.localeCompare(b)
+  })
+
   return (
     <section className="card">
       <header className="card__header">
         <h2>State analysis</h2>
-        <span className="muted mono">{routeStates.length} states on route</span>
+        <span className="muted mono">{routeStates.length} states on route · highest risk first</span>
       </header>
 
       <div className="state-grid">
-        {routeStates.map((stateCode) => {
+        {sortedStates.map((stateCode) => {
           const code = stateCode.toUpperCase()
           const profile = getStateProfile(code)
           const reco = reciprocity.find((r) => r.stateCode === code)
@@ -162,4 +176,58 @@ export default function StateLawPanel({
       </div>
     </section>
   )
+}
+
+// Severity scoring used to sort state cards. Higher = more severe (and
+// renders earlier in the list). The two ingredients are:
+//   1. Reciprocity status — does my permit appear to work in this state?
+//   2. Worst restriction risk level on this state — magazine bans,
+//      AR-style bans, ammunition rules, suppressor rules, etc.
+// Whichever yields the higher score wins; the others are ignored. This
+// avoids a state with one mild caution outranking a state where carry
+// is outright unrecognized.
+function stateSeverityScore(
+  stateCode: string,
+  reciprocity: ReciprocityResult[],
+  restrictions: RestrictionResult[]
+): number {
+  const reco = reciprocity.find((r) => r.stateCode === stateCode)
+  let recoScore = 0
+  switch (reco?.status) {
+    case 'no':
+      recoScore = 100
+      break
+    case 'manual_review':
+      recoScore = 60
+      break
+    case 'limited':
+      recoScore = 40
+      break
+    case 'yes':
+      recoScore = 0
+      break
+  }
+
+  let restrictionScore = 0
+  for (const r of restrictions) {
+    if (r.stateCode !== stateCode) continue
+    let s = 0
+    switch (r.level) {
+      case 'high':
+        s = 80
+        break
+      case 'caution':
+        s = 50
+        break
+      case 'manual_review':
+        s = 30
+        break
+      case 'low':
+        s = 10
+        break
+    }
+    if (s > restrictionScore) restrictionScore = s
+  }
+
+  return Math.max(recoScore, restrictionScore)
 }

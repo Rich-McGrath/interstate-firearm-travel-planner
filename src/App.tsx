@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Disclaimer from './components/Disclaimer'
 import TripForm from './components/TripForm'
-import RouteSummary from './components/RouteSummary'
+import RouteAndFopaPanel from './components/RouteAndFopaPanel'
 import StateLawPanel from './components/StateLawPanel'
 import DutySummaryPanel from './components/DutySummaryPanel'
-import FopaPanel from './components/FopaPanel'
 import StopsSection from './components/StopsSection'
 import ExportPanel from './components/ExportPanel'
 import RecentTripsMenu from './components/RecentTripsMenu'
@@ -288,15 +287,18 @@ export default function App() {
 
           {evaluation && trip && exportPayload && (
             <>
-              <RouteSummary
+              {/* Combined Route + FOPA analysis */}
+              <RouteAndFopaPanel
                 routes={routes}
                 selectedId={evaluation.route.id}
                 onSelect={setSelectedRouteId}
                 computedRiskLevel={evaluation.risk.level}
                 computedRiskScore={evaluation.risk.score}
                 computedRiskReasons={evaluation.risk.reasons}
+                fopa={evaluation.fopa}
               />
 
+              {/* Route & Refueling Stops (map + sidebar) */}
               <StopsSection
                 route={evaluation.route}
                 tripStops={trip.stops}
@@ -313,16 +315,17 @@ export default function App() {
                 onHoverStop={setHoveredStopId}
               />
 
-              <FopaPanel fopa={evaluation.fopa} />
-
+              {/* Duty to inform by state */}
               <DutySummaryPanel routeStates={evaluation.route.statesCrossed} />
 
+              {/* State analysis — sorted by severity descending */}
               <StateLawPanel
                 reciprocity={evaluation.reciprocity}
                 restrictions={evaluation.restrictions}
                 routeStates={evaluation.route.statesCrossed}
               />
 
+              {/* Export & checklist */}
               <ExportPanel
                 trip={trip}
                 origin={exportPayload.origin.label}
