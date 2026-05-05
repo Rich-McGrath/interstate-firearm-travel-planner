@@ -37,6 +37,19 @@ export function evaluateReciprocity(input: ReciprocityInput): ReciprocityResult[
       }
     }
 
+    // Special case: the carrier is in the state that issued their own
+    // permit. The generic "${stateName} appears to recognize a ${issuing}
+    // permit" template reads as awkward tautology when those are the same
+    // state, so override the detail with home-state language. The status
+    // stays 'yes' so the carry pill remains consistent across all states.
+    if (code === issuingState) {
+      return {
+        stateCode: code,
+        status: 'yes',
+        detail: `Carrying on the issuing state's own permit. Confirm any conditions before relying on it.`,
+      }
+    }
+
     const status = profile.permitRecognition[issuingState] ?? 'manual_review'
 
     let detail = ''
