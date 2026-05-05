@@ -848,7 +848,7 @@ p { margin: 0 0 0.8em; color: var(--cream-1); }
   display: flex;
   flex-direction: column;
   gap: 0.55rem;
-  transition: border-color 0.15s, background 0.15s;
+  transition: border-color 0.15s, background 0.15s, transform 0.15s, box-shadow 0.15s;
 }
 
 .stop-card.is-selected {
@@ -1860,6 +1860,101 @@ p { margin: 0 0 0.8em; color: var(--cream-1); }
   background: var(--amber-bg);
   border: 1px solid var(--amber-line);
   border-radius: 2px;
+}
+
+/* =====================================================================
+   Map ↔ list hover sync + map popup styling
+   ===================================================================== */
+
+/* Stop card highlighted when corresponding pin is hovered on map */
+.stop-card.is-hovered {
+  border-color: var(--amber);
+  box-shadow: 0 0 0 1px var(--amber-line) inset, 0 6px 18px rgba(224, 168, 46, 0.18);
+  transform: translateY(-1px);
+}
+
+/* Legend entry for stop pins on the map */
+.route-map-legend__item--stop i.route-map-legend__stop {
+  background: transparent;
+  border: 2px solid var(--amber);
+  border-radius: 50%;
+  width: 0.85rem;
+  height: 0.85rem;
+}
+
+/* Hint line under the map */
+.route-map__hint {
+  margin: 0.5rem 0 0;
+  text-align: center;
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+}
+
+/* Mapbox popup body for suggested stops */
+.mapboxgl-popup-content .map-popup__title {
+  font-family: var(--serif);
+  font-size: 1rem;
+  color: var(--cream-1);
+  margin-bottom: 0.35rem;
+  line-height: 1.2;
+}
+
+.mapboxgl-popup-content .map-popup__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 0.7rem;
+  font-size: 0.75rem;
+  color: var(--cream-2);
+  margin-bottom: 0.45rem;
+}
+
+.mapboxgl-popup-content .map-popup__meta strong {
+  color: var(--cream-1);
+}
+
+.mapboxgl-popup-content .map-popup__ctx {
+  font-size: 0.72rem;
+  color: var(--cream-3);
+  padding-top: 0.35rem;
+  margin-bottom: 0.5rem;
+  border-top: 1px dashed var(--ink-rule);
+}
+
+.mapboxgl-popup-content .map-popup__ctx .mono {
+  color: var(--amber-2);
+  font-weight: 600;
+}
+
+.mapboxgl-popup-content .map-popup__btn {
+  appearance: none;
+  width: 100%;
+  background: var(--amber-bg);
+  color: var(--amber);
+  border: 1px solid var(--amber-line);
+  border-radius: 3px;
+  padding: 0.5rem 0.7rem;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.mapboxgl-popup-content .map-popup__btn:hover {
+  background: var(--amber);
+  color: var(--ink-1);
+}
+
+.mapboxgl-popup-content .map-popup__btn.is-selected {
+  background: var(--risk-low-bg);
+  color: var(--risk-low);
+  border-color: var(--risk-low-line);
+}
+
+.mapboxgl-popup-content .map-popup__btn.is-selected:hover {
+  background: var(--risk-low);
+  color: var(--ink-1);
 }
 
 

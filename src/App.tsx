@@ -14,6 +14,7 @@ import { evaluateReciprocity } from './rules/evaluateReciprocity'
 import { evaluateRestrictions } from './rules/evaluateRestrictions'
 import { scoreRouteRisk } from './rules/scoreRouteRisk'
 import { enrichStopsWithStateContext } from './rules/enrichStops'
+import { scoreStops } from './rules/scoreStops'
 import { generateChecklist } from './utils/checklist'
 import {
   getDirections,
@@ -36,6 +37,7 @@ import {
   tripDestination,
   tripOrigin,
   type RouteOption,
+  type StopFilters,
   type StopRecommendation,
   type TripInput,
 } from './types/domain'
@@ -87,6 +89,13 @@ export default function App() {
   const [routesError, setRoutesError] = useState<string | null>(null)
   const [selectedRouteId, setSelectedRouteId] = useState<string>('')
   const [selectedStopIds, setSelectedStopIds] = useState<string[]>([])
+  const [hoveredStopId, setHoveredStopId] = useState<string | null>(null)
+  const [stopFilters, setStopFilters] = useState<StopFilters>({
+    category: 'all',
+    openNowOnly: false,
+    chainOnly: false,
+    sortBy: 'score',
+  })
 
   // Suggested refueling stops along the currently-selected route.
   const [suggestedStops, setSuggestedStops] = useState<StopRecommendation[]>([])
@@ -219,6 +228,15 @@ export default function App() {
     [suggestedStops, evaluation?.route]
   )
 
+  // Apply filters once at the App level so the map and the list always
+  // agree on what's visible. scoreStops handles the filter+sort+score
+  // pipeline; the cast is safe because EnrichedStop extends
+  // StopRecommendation and scoreStops doesn't drop the extra fields.
+  const filteredStops = useMemo(
+    () => scoreStops(enrichedStops as StopRecommendation[], stopFilters) as typeof enrichedStops,
+    [enrichedStops, stopFilters]
+  )
+
   function toggleStop(id: string) {
     setSelectedStopIds((prev) =>
       prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]
@@ -295,6 +313,11 @@ export default function App() {
                   stops={trip.stops}
                   reciprocity={evaluation.reciprocity}
                   restrictions={evaluation.restrictions}
+                  suggestedStops={filteredStops}
+                  selectedStopIds={selectedStopIds}
+                  hoveredStopId={hoveredStopId}
+                  onToggleStop={toggleStop}
+                  onHoverStop={setHoveredStopId}
                 />
               </Suspense>
 
@@ -309,10 +332,15 @@ export default function App() {
               />
 
               <StopsPanel
-                stops={enrichedStops}
+                scored={filteredStops}
+                totalCount={enrichedStops.length}
                 loading={stopsLoading}
+                filters={stopFilters}
+                onFiltersChange={setStopFilters}
                 selectedStopIds={selectedStopIds}
+                hoveredStopId={hoveredStopId}
                 onToggleSelect={toggleStop}
+                onHoverStop={setHoveredStopId}
               />
 
               <ExportPanel

@@ -8,6 +8,7 @@ import type {
   RouteOption,
   TripStop,
 } from '../types/domain'
+import type { EnrichedStop } from '../rules/enrichStops'
 import { riskLevelForState } from '../rules/riskLevelForState'
 
 interface Props {
@@ -15,12 +16,17 @@ interface Props {
   stops: TripStop[]
   reciprocity: ReciprocityResult[]
   restrictions: RestrictionResult[]
+  // Suggested refueling stops (already filtered upstream — what's on the
+  // map matches what's in the StopsPanel list 1-to-1).
+  suggestedStops: EnrichedStop[]
+  selectedStopIds: string[]
+  hoveredStopId: string | null
+  onToggleStop: (id: string) => void
+  onHoverStop: (id: string | null) => void
 }
 
 const PUBLIC_TOKEN = (import.meta.env['VITE_MAPBOX_PUBLIC_TOKEN'] as string | undefined) ?? ''
 
-// Color values mirror styles.css risk colors so the map is consistent
-// with the rest of the UI.
 const RISK_COLORS: Record<RiskLevel, string> = {
   low: '#5dd498',
   caution: '#f0bf52',
@@ -28,14 +34,49 @@ const RISK_COLORS: Record<RiskLevel, string> = {
   manual_review: '#8b95a5',
 }
 
-const STOP_PIN_COLOR = '#e0a82e'
+const TRIP_PIN_COLOR = '#e0a82e'
+const STOP_FILL_UNSELECTED = '#1a2330'
+const STOP_FILL_SELECTED = '#e0a82e'
+const STOP_STROKE = '#e0a82e'
+const STOP_STROKE_HOVERED = '#fbe5a2'
 
-export default function RouteMap({ route, stops, reciprocity, restrictions }: Props) {
+// Layer / source IDs — kept as constants so add/remove logic stays in sync.
+const SRC_STOPS = 'suggested-stops-src'
+const LYR_STOPS_CLUSTERS = 'suggested-stops-clusters'
+const LYR_STOPS_CLUSTER_COUNT = 'suggested-stops-cluster-count'
+const LYR_STOPS_POINTS = 'suggested-stops-points'
+
+export default function RouteMap({
+  route,
+  stops,
+  reciprocity,
+  restrictions,
+  suggestedStops,
+  selectedStopIds,
+  hoveredStopId,
+  onToggleStop,
+  onHoverStop,
+}: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<mapboxgl.Map | null>(null)
-  const markersRef = useRef<mapboxgl.Marker[]>([])
+  const tripMarkersRef = useRef<mapboxgl.Marker[]>([])
+  const popupRef = useRef<mapboxgl.Popup | null>(null)
 
-  // Initialize the map once.
+  // Refs hold the latest closure-bound props/callbacks so the map's
+  // event handlers (registered once at init) see current data without
+  // re-binding handlers on every render.
+  const onToggleStopRef = useRef(onToggleStop)
+  const onHoverStopRef = useRef(onHoverStop)
+  const suggestedStopsRef = useRef(suggestedStops)
+  const selectedStopIdsRef = useRef(selectedStopIds)
+  useEffect(() => {
+    onToggleStopRef.current = onToggleStop
+    onHoverStopRef.current = onHoverStop
+    suggestedStopsRef.current = suggestedStops
+    selectedStopIdsRef.current = selectedStopIds
+  })
+
+  // Initialize map once.
   useEffect(() => {
     if (!PUBLIC_TOKEN || !containerRef.current) return
 
@@ -43,38 +84,107 @@ export default function RouteMap({ route, stops, reciprocity, restrictions }: Pr
     const map = new mapboxgl.Map({
       container: containerRef.current,
       style: 'mapbox://styles/mapbox/dark-v11',
-      center: [-98, 39], // continental US fallback
+      center: [-98, 39],
       zoom: 3,
       attributionControl: true,
     })
     map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right')
     mapRef.current = map
 
+    // Wire stop interactions once the style is loaded — handlers are
+    // registered against layer IDs that don't yet exist when init runs,
+    // so wait. Mapbox accepts handlers for not-yet-present layers, but
+    // it's cleanest to delay until after the style is up.
+    map.once('load', () => {
+      // Click on a clustered point — zoom into the cluster.
+      map.on('click', LYR_STOPS_CLUSTERS, (e) => {
+        const features = map.queryRenderedFeatures(e.point, {
+          layers: [LYR_STOPS_CLUSTERS],
+        })
+        const clusterId = features[0]?.properties?.['cluster_id']
+        if (clusterId === undefined) return
+        const src = map.getSource(SRC_STOPS) as mapboxgl.GeoJSONSource
+        src.getClusterExpansionZoom(clusterId, (err, zoom) => {
+          if (err) return
+          const geom = features[0]?.geometry
+          if (geom?.type === 'Point') {
+            map.easeTo({
+              center: geom.coordinates as [number, number],
+              zoom: zoom ?? map.getZoom() + 1,
+              duration: 500,
+            })
+          }
+        })
+      })
+
+      // Click on an unclustered stop — open a popup with details + action.
+      map.on('click', LYR_STOPS_POINTS, (e) => {
+        const feature = e.features?.[0]
+        if (!feature || feature.geometry.type !== 'Point') return
+        const id = feature.properties?.['id'] as string | undefined
+        if (!id) return
+        const stop = suggestedStopsRef.current.find((s) => s.id === id)
+        if (!stop) return
+        const coords = feature.geometry.coordinates.slice() as [number, number]
+        const isSelected = selectedStopIdsRef.current.includes(id)
+        showPopup(map, popupRef, coords, stop, isSelected, () => {
+          onToggleStopRef.current(id)
+          // Close popup; the next render will apply the new selection
+          // styling and the user can re-open with a fresh click.
+          popupRef.current?.remove()
+          popupRef.current = null
+        })
+      })
+
+      // Hover sync: tell the parent which stop the user is over so the
+      // list can highlight + scroll-into-view in tandem.
+      map.on('mouseenter', LYR_STOPS_POINTS, (e) => {
+        map.getCanvas().style.cursor = 'pointer'
+        const id = e.features?.[0]?.properties?.['id'] as string | undefined
+        if (id) onHoverStopRef.current(id)
+      })
+      map.on('mouseleave', LYR_STOPS_POINTS, () => {
+        map.getCanvas().style.cursor = ''
+        onHoverStopRef.current(null)
+      })
+      map.on('mouseenter', LYR_STOPS_CLUSTERS, () => {
+        map.getCanvas().style.cursor = 'pointer'
+      })
+      map.on('mouseleave', LYR_STOPS_CLUSTERS, () => {
+        map.getCanvas().style.cursor = ''
+      })
+    })
+
     return () => {
+      popupRef.current?.remove()
+      popupRef.current = null
       map.remove()
       mapRef.current = null
     }
   }, [])
 
-  // Render the route + stops whenever inputs change.
+  // Render the route + trip markers when those inputs change.
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
-
-    // The map may not be ready yet on first render; defer until styledata
-    // load, then re-run.
     const apply = () => {
       drawRoute(map, route, reciprocity, restrictions)
-      drawMarkers(map, stops, markersRef)
+      drawTripMarkers(map, stops, tripMarkersRef)
       fitToRoute(map, route)
     }
-
-    if (map.isStyleLoaded()) {
-      apply()
-    } else {
-      map.once('load', apply)
-    }
+    if (map.isStyleLoaded()) apply()
+    else map.once('load', apply)
   }, [route, stops, reciprocity, restrictions])
+
+  // Render / update the suggested-stops layer separately so toggling a
+  // stop's selection state doesn't redraw the whole route.
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+    const apply = () => upsertStopsLayer(map, suggestedStops, selectedStopIds, hoveredStopId)
+    if (map.isStyleLoaded()) apply()
+    else map.once('load', apply)
+  }, [suggestedStops, selectedStopIds, hoveredStopId])
 
   if (!PUBLIC_TOKEN) {
     return (
@@ -98,15 +208,25 @@ export default function RouteMap({ route, stops, reciprocity, restrictions }: Pr
           <span className="route-map-legend__item"><i style={{ background: RISK_COLORS.caution }} />Caution</span>
           <span className="route-map-legend__item"><i style={{ background: RISK_COLORS.high }} />Higher</span>
           <span className="route-map-legend__item"><i style={{ background: RISK_COLORS.manual_review }} />Manual</span>
+          {suggestedStops.length > 0 && (
+            <span className="route-map-legend__item route-map-legend__item--stop">
+              <i className="route-map-legend__stop" />Stops
+            </span>
+          )}
         </span>
       </header>
       <div className="route-map" ref={containerRef} />
+      {suggestedStops.length > 0 && (
+        <p className="route-map__hint muted small">
+          Click a pin to see details and add the stop to your trip. Hover to highlight in the list below.
+        </p>
+      )}
     </section>
   )
 }
 
 // ---------------------------------------------------------------------------
-// Drawing helpers
+// Route + trip-stop drawing (mostly unchanged from prior version)
 // ---------------------------------------------------------------------------
 
 function drawRoute(
@@ -115,7 +235,6 @@ function drawRoute(
   reciprocity: ReciprocityResult[],
   restrictions: RestrictionResult[]
 ) {
-  // Remove any existing route layers/sources from a previous render.
   const style = map.getStyle()
   if (style?.layers) {
     for (const l of style.layers) {
@@ -150,33 +269,25 @@ function drawRoute(
       type: 'line',
       source: id,
       layout: { 'line-cap': 'round', 'line-join': 'round' },
-      paint: {
-        'line-color': color,
-        'line-width': 4,
-        'line-opacity': 0.92,
-      },
+      paint: { 'line-color': color, 'line-width': 4, 'line-opacity': 0.92 },
     })
   })
 }
 
-function drawMarkers(
+function drawTripMarkers(
   map: mapboxgl.Map,
   stops: TripStop[],
-  markersRef: React.MutableRefObject<mapboxgl.Marker[]>
+  ref: React.MutableRefObject<mapboxgl.Marker[]>
 ) {
-  // Clear previous markers
-  for (const m of markersRef.current) m.remove()
-  markersRef.current = []
-
+  for (const m of ref.current) m.remove()
+  ref.current = []
   stops.forEach((s, i) => {
     if (!s.coords) return
-    const role =
-      i === 0 ? 'Origin' : i === stops.length - 1 ? 'Destination' : `Stop ${i}`
+    const role = i === 0 ? 'Origin' : i === stops.length - 1 ? 'Destination' : `Stop ${i}`
     const el = document.createElement('div')
     el.className = 'map-pin'
-    el.style.background = STOP_PIN_COLOR
+    el.style.background = TRIP_PIN_COLOR
     el.textContent = String(i + 1)
-
     const marker = new mapboxgl.Marker({ element: el })
       .setLngLat([s.coords.lng, s.coords.lat])
       .setPopup(
@@ -185,7 +296,7 @@ function drawMarkers(
         )
       )
       .addTo(map)
-    markersRef.current.push(marker)
+    ref.current.push(marker)
   })
 }
 
@@ -197,7 +308,171 @@ function fitToRoute(map: mapboxgl.Map, route: RouteOption) {
 }
 
 // ---------------------------------------------------------------------------
-// Polyline decoding (matches the worker's encoder, precision 5)
+// Suggested-stops layer (clustered, interactive)
+// ---------------------------------------------------------------------------
+
+function upsertStopsLayer(
+  map: mapboxgl.Map,
+  stops: EnrichedStop[],
+  selectedIds: string[],
+  hoveredId: string | null
+) {
+  const fc = {
+    type: 'FeatureCollection' as const,
+    features: stops.map((s) => ({
+      type: 'Feature' as const,
+      geometry: { type: 'Point' as const, coordinates: [s.lng, s.lat] },
+      properties: {
+        id: s.id,
+        name: s.name,
+        category: s.category,
+        score: s.score,
+        selected: selectedIds.includes(s.id) ? 1 : 0,
+        hovered: s.id === hoveredId ? 1 : 0,
+      },
+    })),
+  }
+
+  const existing = map.getSource(SRC_STOPS) as mapboxgl.GeoJSONSource | undefined
+  if (existing) {
+    existing.setData(fc)
+    return
+  }
+
+  // First-time setup of source + 3 layers (cluster bubbles, cluster
+  // counts, individual stop circles).
+  map.addSource(SRC_STOPS, {
+    type: 'geojson',
+    data: fc,
+    cluster: true,
+    clusterMaxZoom: 11,
+    clusterRadius: 40,
+  })
+
+  map.addLayer({
+    id: LYR_STOPS_CLUSTERS,
+    type: 'circle',
+    source: SRC_STOPS,
+    filter: ['has', 'point_count'],
+    paint: {
+      'circle-color': '#1a2330',
+      'circle-stroke-color': STOP_STROKE,
+      'circle-stroke-width': 2,
+      'circle-radius': [
+        'step',
+        ['get', 'point_count'],
+        14, 5,
+        18, 15,
+        22,
+      ],
+    },
+  })
+
+  map.addLayer({
+    id: LYR_STOPS_CLUSTER_COUNT,
+    type: 'symbol',
+    source: SRC_STOPS,
+    filter: ['has', 'point_count'],
+    layout: {
+      'text-field': ['get', 'point_count_abbreviated'],
+      'text-font': ['DIN Offc Pro Medium', 'Arial Unicode MS Bold'],
+      'text-size': 12,
+    },
+    paint: {
+      'text-color': STOP_STROKE,
+    },
+  })
+
+  map.addLayer({
+    id: LYR_STOPS_POINTS,
+    type: 'circle',
+    source: SRC_STOPS,
+    filter: ['!', ['has', 'point_count']],
+    paint: {
+      // Selected stops are filled; unselected are outline-only.
+      'circle-color': [
+        'case',
+        ['==', ['get', 'selected'], 1], STOP_FILL_SELECTED,
+        STOP_FILL_UNSELECTED,
+      ],
+      'circle-stroke-color': [
+        'case',
+        ['==', ['get', 'hovered'], 1], STOP_STROKE_HOVERED,
+        STOP_STROKE,
+      ],
+      // Hovered stops are larger so they pop visually.
+      'circle-radius': [
+        'case',
+        ['==', ['get', 'hovered'], 1], 9,
+        7,
+      ],
+      'circle-stroke-width': [
+        'case',
+        ['==', ['get', 'hovered'], 1], 3,
+        2,
+      ],
+    },
+  })
+}
+
+function showPopup(
+  map: mapboxgl.Map,
+  popupRef: React.MutableRefObject<mapboxgl.Popup | null>,
+  coords: [number, number],
+  stop: EnrichedStop,
+  isSelected: boolean,
+  onAction: () => void
+) {
+  popupRef.current?.remove()
+
+  const ctxBits: string[] = []
+  if (stop.contextStateCode) ctxBits.push(`<span class="mono">${stop.contextStateCode}</span>`)
+  if (stop.contextDuty && stop.contextDuty !== 'no_duty') {
+    ctxBits.push(formatDuty(stop.contextDuty))
+  }
+  if (stop.contextRestrictive) ctxBits.push('Restrictive state')
+  const ctxLine = ctxBits.length > 0 ? `<div class="map-popup__ctx">${ctxBits.join(' · ')}</div>` : ''
+
+  const html = `
+    <div class="map-popup">
+      <div class="map-popup__title">${escapeHtml(stop.name)}</div>
+      <div class="map-popup__meta">
+        <span><strong>${stop.score}</strong> score</span>
+        <span>${stop.distanceOffRouteMiles.toFixed(1)} mi off route</span>
+        <span>${stop.category.replace('_', ' + ')}</span>
+      </div>
+      ${ctxLine}
+      <button type="button" class="map-popup__btn ${isSelected ? 'is-selected' : ''}" data-act="toggle">
+        ${isSelected ? '✓ Added — click to remove' : 'Add to trip'}
+      </button>
+    </div>
+  `
+  const popup = new mapboxgl.Popup({ offset: 14, closeButton: true, maxWidth: '280px' })
+    .setLngLat(coords)
+    .setHTML(html)
+    .addTo(map)
+
+  // The popup's HTML lives in a real DOM node we can query after .addTo().
+  const el = popup.getElement()
+  if (el) {
+    const btn = el.querySelector<HTMLButtonElement>('button[data-act="toggle"]')
+    btn?.addEventListener('click', onAction)
+  }
+
+  popupRef.current = popup
+}
+
+function formatDuty(d: string): string {
+  switch (d) {
+    case 'must_inform': return 'Must inform'
+    case 'inform_if_asked': return 'Inform if asked'
+    case 'manual_review': return 'Review'
+    default: return d
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Polyline decoding (precision 5)
 // ---------------------------------------------------------------------------
 
 function decodePolyline(str: string): [number, number][] {
@@ -230,11 +505,6 @@ function decodePolyline(str: string): [number, number][] {
   return points
 }
 
-// ---------------------------------------------------------------------------
-// Split the polyline into segments where consecutive samples agree on
-// state. Boundary points are duplicated so adjacent segments visually
-// connect.
-// ---------------------------------------------------------------------------
 interface RouteSegment {
   stateCode: string | undefined
   points: [number, number][]
@@ -245,11 +515,9 @@ function buildSegments(
   samples: { polylineIndex: number; stateCode?: string }[]
 ): RouteSegment[] {
   if (points.length === 0 || samples.length === 0) return []
-
   const segments: RouteSegment[] = []
   let segStart = 0
   let currentState = samples[0]?.stateCode
-
   for (let i = 1; i < samples.length; i++) {
     const s = samples[i]
     if (!s) continue
@@ -260,10 +528,8 @@ function buildSegments(
       currentState = s.stateCode
     }
   }
-  // Tail
   const tail = points.slice(segStart)
   if (tail.length > 1) segments.push({ stateCode: currentState, points: tail })
-
   return segments
 }
 
