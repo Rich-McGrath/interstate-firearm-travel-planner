@@ -1356,6 +1356,202 @@ p { margin: 0 0 0.8em; color: var(--cream-1); }
 .mapboxgl-ctrl-attrib a { color: var(--amber-2) !important; }
 
 /* =====================================================================
+   Pills (carry + duty banners on state cards)
+   ===================================================================== */
+
+.state-card__pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0.4rem 0 0.65rem;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: stretch;
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  border-radius: 3px;
+  overflow: hidden;
+  border: 1px solid var(--ink-rule-2);
+  background: var(--ink-3);
+}
+
+.pill__label {
+  padding: 0.3rem 0.55rem;
+  background: var(--ink-2);
+  color: var(--cream-3);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 0.66rem;
+  display: inline-flex;
+  align-items: center;
+}
+
+.pill__value {
+  padding: 0.3rem 0.6rem;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Carry-allowed pill (mirrors recognition colors) */
+.pill.reco-yes { border-color: var(--risk-low-line); }
+.pill.reco-yes .pill__value { color: var(--risk-low); background: var(--risk-low-bg); }
+.pill.reco-limited { border-color: var(--risk-caution-line); }
+.pill.reco-limited .pill__value { color: var(--risk-caution); background: var(--risk-caution-bg); }
+.pill.reco-no { border-color: var(--risk-high-line); }
+.pill.reco-no .pill__value { color: var(--risk-high); background: var(--risk-high-bg); }
+.pill.reco-manual_review { border-color: var(--risk-mr-line); }
+.pill.reco-manual_review .pill__value { color: var(--risk-mr); background: var(--risk-mr-bg); }
+
+/* Duty-to-inform pill — distinct color system from carry */
+.pill.duty-no_duty { border-color: var(--risk-low-line); }
+.pill.duty-no_duty .pill__value { color: var(--risk-low); background: var(--risk-low-bg); }
+.pill.duty-must_inform { border-color: var(--risk-high-line); }
+.pill.duty-must_inform .pill__value { color: var(--risk-high); background: var(--risk-high-bg); }
+.pill.duty-inform_if_asked { border-color: var(--risk-caution-line); }
+.pill.duty-inform_if_asked .pill__value { color: var(--risk-caution); background: var(--risk-caution-bg); }
+.pill.duty-manual_review { border-color: var(--risk-mr-line); }
+.pill.duty-manual_review .pill__value { color: var(--risk-mr); background: var(--risk-mr-bg); }
+
+/* Inline duty colors used in route-switch and elsewhere */
+.duty-must_inform { color: var(--risk-high); }
+.duty-inform_if_asked { color: var(--risk-caution); }
+.duty-no_duty { color: var(--risk-low); }
+.duty-manual_review { color: var(--risk-mr); }
+
+/* Badges in the duty panel use the same color logic as pills */
+.badge.duty-no_duty {
+  background: var(--risk-low-bg);
+  color: var(--risk-low);
+  border-color: var(--risk-low-line);
+}
+.badge.duty-must_inform {
+  background: var(--risk-high-bg);
+  color: var(--risk-high);
+  border-color: var(--risk-high-line);
+}
+.badge.duty-inform_if_asked {
+  background: var(--risk-caution-bg);
+  color: var(--risk-caution);
+  border-color: var(--risk-caution-line);
+}
+.badge.duty-manual_review {
+  background: var(--risk-mr-bg);
+  color: var(--risk-mr);
+  border-color: var(--risk-mr-line);
+}
+
+/* =====================================================================
+   Duty summary panel
+   ===================================================================== */
+
+.duty-groups {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.duty-group {
+  background: var(--ink-2);
+  border: 1px solid var(--ink-rule);
+  border-left: 3px solid var(--ink-rule-2);
+  border-radius: var(--radius);
+  padding: 0.85rem 1rem;
+}
+
+.duty-group.duty-must_inform { border-left-color: var(--risk-high); }
+.duty-group.duty-inform_if_asked { border-left-color: var(--risk-caution); }
+.duty-group.duty-no_duty { border-left-color: var(--risk-low); }
+.duty-group.duty-manual_review { border-left-color: var(--risk-mr); }
+
+.duty-group__header {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin-bottom: 0.4rem;
+}
+
+.duty-group__count { color: var(--cream-3); }
+
+.duty-group__help {
+  margin: 0 0 0.6rem;
+  font-size: 0.9rem;
+  color: var(--cream-1);
+}
+
+.duty-group__states {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.55rem;
+}
+
+.duty-group__state {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  padding: 0.3rem 0.55rem;
+  background: var(--ink-3);
+  border: 1px solid var(--ink-rule);
+  border-radius: 3px;
+  font-size: 0.85rem;
+  color: var(--cream-1);
+}
+
+.duty-group__state .mono {
+  color: var(--amber);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+/* =====================================================================
+   Route switch enhancements (recommended pick + duty counts)
+   ===================================================================== */
+
+.route-switch__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.route-switch__pick {
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  background: var(--risk-low-bg);
+  color: var(--risk-low);
+  border: 1px solid var(--risk-low-line);
+  padding: 0.15rem 0.45rem;
+  border-radius: 2px;
+  white-space: nowrap;
+}
+
+.route-switch__btn.is-recommended:not(.is-active) {
+  border-color: var(--risk-low-line);
+}
+
+.route-switch__duty {
+  display: flex;
+  gap: 0.85rem;
+  margin-top: 0.25rem;
+  font-size: 0.74rem;
+}
+
+
+
+@media (max-width: 540px) {
+  .app__header { padding: 1.25rem 1rem; }
+  .app__brand { flex-direction: column; align-items: flex-start; gap: 0.7rem; }
+  .app__main { padding: 1rem; gap: 1rem; }
+  .card, .trip-form { padding: 1.1rem; }
+}
+
+/* =====================================================================
    Mobile
    ===================================================================== */
 

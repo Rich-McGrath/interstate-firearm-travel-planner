@@ -21,6 +21,11 @@ export type RiskLevel = 'low' | 'caution' | 'high' | 'manual_review'
 export type SourceType = 'official' | 'secondary' | 'missing'
 export type StopCategory = 'gas' | 'food' | 'gas_food'
 export type StopLabel = 'recommended' | 'better_traffic' | 'manual_review'
+export type DutyToInform =
+  | 'no_duty' // no requirement to volunteer carry status
+  | 'must_inform' // must volunteer carry status when stopped
+  | 'inform_if_asked' // must answer truthfully if asked
+  | 'manual_review'
 
 export interface Coordinate {
   lng: number
@@ -101,6 +106,10 @@ export interface StateLawProfile {
   // Map of permit-issuing state code -> recognition status when carrying
   // through this state. 'manual_review' is the default for unknown pairs.
   permitRecognition: Record<string, RecognitionStatus>
+  // What the carrier must do regarding carry status when stopped by law
+  // enforcement in this state. Applies only when carrying is actually
+  // permitted (recognition !== 'no').
+  dutyToInform: DutyToInform
   magazineLimit?: number
   hasAssaultWeaponBan?: boolean
   hasSpecialTransportRules?: boolean

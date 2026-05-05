@@ -3,6 +3,7 @@ import Disclaimer from './components/Disclaimer'
 import TripForm from './components/TripForm'
 import RouteSummary from './components/RouteSummary'
 import StateLawPanel from './components/StateLawPanel'
+import DutySummaryPanel from './components/DutySummaryPanel'
 import FopaPanel from './components/FopaPanel'
 import StopsPanel from './components/StopsPanel'
 import ExportPanel from './components/ExportPanel'
@@ -215,6 +216,8 @@ export default function App() {
             </Suspense>
 
             <FopaPanel fopa={evaluation.fopa} />
+
+            <DutySummaryPanel routeStates={evaluation.route.statesCrossed} />
 
             <StateLawPanel
               reciprocity={evaluation.reciprocity}

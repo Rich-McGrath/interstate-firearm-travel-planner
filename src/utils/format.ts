@@ -1,4 +1,5 @@
 import type {
+  DutyToInform,
   RecognitionStatus,
   RiskLevel,
   StopLabel,
@@ -67,4 +68,34 @@ export function recognitionClassName(status: RecognitionStatus): string {
 
 export function stopLabelClassName(label: StopLabel): string {
   return `label-${label}`
+}
+
+export function formatDutyToInform(d: DutyToInform): string {
+  switch (d) {
+    case 'no_duty':
+      return 'No duty to inform'
+    case 'must_inform':
+      return 'Must inform'
+    case 'inform_if_asked':
+      return 'Inform if asked'
+    case 'manual_review':
+      return 'Manual review'
+  }
+}
+
+export function dutyShortLabel(d: DutyToInform): string {
+  switch (d) {
+    case 'no_duty':
+      return 'No duty'
+    case 'must_inform':
+      return 'Must inform'
+    case 'inform_if_asked':
+      return 'If asked'
+    case 'manual_review':
+      return 'Review'
+  }
+}
+
+export function dutyClassName(d: DutyToInform): string {
+  return `duty-${d}`
 }

@@ -4,6 +4,8 @@ import type {
 } from '../types/domain'
 import { getStateName, getStateProfile } from '../data/states'
 import {
+  dutyClassName,
+  formatDutyToInform,
   formatRecognitionStatus,
   formatRiskLevel,
   recognitionClassName,
@@ -34,6 +36,19 @@ export default function StateLawPanel({
           const profile = getStateProfile(code)
           const reco = reciprocity.find((r) => r.stateCode === code)
           const stateRestrictions = restrictions.filter((r) => r.stateCode === code)
+
+          // Carry-allowed banner — derived from reciprocity status. Even
+          // with a recognized permit, "limited" means conditions apply
+          // and we surface that distinctly from a clean "yes".
+          const carryAllowed: 'yes' | 'limited' | 'no' | 'manual_review' =
+            reco?.status ?? 'manual_review'
+
+          // Duty-to-inform is only meaningful when carry is actually
+          // allowed. If carry is 'no', the duty question is moot —
+          // surface that clearly.
+          const dutyShown =
+            carryAllowed === 'no' ? null : profile?.dutyToInform ?? 'manual_review'
+
           return (
             <article key={code} className="state-card">
               <header className="state-card__header">
@@ -41,12 +56,24 @@ export default function StateLawPanel({
                   <span className="state-card__code mono">{code}</span>
                   <h3>{getStateName(code)}</h3>
                 </div>
-                {reco && (
-                  <span className={`badge ${recognitionClassName(reco.status)}`}>
-                    {formatRecognitionStatus(reco.status)}
+              </header>
+
+              <div className="state-card__pills">
+                <span className={`pill ${recognitionClassName(carryAllowed)}`}>
+                  <span className="pill__label mono">Carry</span>
+                  <span className="pill__value">
+                    {formatRecognitionStatus(carryAllowed)}
+                  </span>
+                </span>
+                {dutyShown && (
+                  <span className={`pill ${dutyClassName(dutyShown)}`}>
+                    <span className="pill__label mono">Duty</span>
+                    <span className="pill__value">
+                      {formatDutyToInform(dutyShown)}
+                    </span>
                   </span>
                 )}
-              </header>
+              </div>
 
               {reco && <p className="state-card__detail">{reco.detail}</p>}
 
