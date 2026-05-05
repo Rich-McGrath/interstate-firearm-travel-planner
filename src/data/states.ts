@@ -4,6 +4,7 @@ import type {
   SourceRef,
   StateLawProfile,
 } from '../types/domain'
+import { officialSourceFor } from './officialSources'
 
 // SEED DATA. Illustrative only. Every entry is a coarse 3-tier
 // classification of the state's carry-recognition posture, not a
@@ -14,10 +15,10 @@ import type {
 //
 // To update an entry: change the values, bump `lastVerified` to today's
 // ISO date, and update `source` to point at the page you actually
-// consulted. States without explicit lastVerified/source fall back to
-// the module-level DEFAULT_VERIFIED and DEFAULT_SOURCE — which is fine
-// for initial seeding but should be treated as "not yet individually
-// verified."
+// consulted. States without an explicit `source` fall back to the
+// state's official firearms-licensing page (defined in
+// officialSources.ts), but the entry is marked as not individually
+// verified so users know they're seeing a compilation, not a citation.
 
 type CarryPolicy =
   | 'broad' // permissive — generally recognizes most other state permits
@@ -39,7 +40,7 @@ interface StateDef {
   ammunitionRestrictions?: { detail: string; level: 'low' | 'caution' | 'high' | 'manual_review' }[]
   notes: string[]
   // Per-state provenance — recommended to set whenever you touch the
-  // entry. Falls back to module defaults if omitted.
+  // entry. Falls back to the state's official source page if omitted.
   lastVerified?: string // ISO date
   source?: SourceRef
   confidence?: 'high' | 'medium' | 'low'
@@ -50,10 +51,14 @@ interface StateDef {
 // per-state, prefer setting lastVerified on each entry directly.
 const DEFAULT_VERIFIED = '2025-12-01'
 const DEFAULT_CONFIDENCE: 'high' | 'medium' | 'low' = 'medium'
-const DEFAULT_SOURCE: SourceRef = {
-  url: 'https://www.usconcealedcarry.com/resources/ccw_reciprocity_map/',
+
+// Last-resort fallback when a state has neither an explicit source nor
+// an entry in officialSources.ts. Should rarely fire — every US state
+// + DC is in officialSources.ts.
+const GENERIC_FALLBACK_SOURCE: SourceRef = {
+  url: 'https://www.atf.gov/firearms/state-laws-and-published-ordinances-firearms',
   type: 'secondary',
-  label: 'seed dataset',
+  label: 'ATF state laws compilation',
 }
 
 // All 50 states + DC. Policy assignments are conservative approximations.
@@ -374,6 +379,19 @@ function buildPermitRecognition(carrying: StateDef): Record<string, RecognitionS
 }
 
 function toProfile(code: string, def: StateDef): StateLawProfile {
+  // Source-of-truth resolution, in priority order:
+  //   1. Explicit per-state `source` block (someone has individually verified)
+  //   2. State's own official firearms-licensing page (officialSources.ts)
+  //   3. Generic ATF compilation as a last resort
+  //
+  // Crucially, in case 2 we mark the source `type: 'official'` so users
+  // know they're looking at the right authority, even though we
+  // ourselves haven't verified the specific claim. The state card
+  // surfaces the "individually verified vs. compilation reference"
+  // distinction via the `confidence` field, not the source type.
+  const source: SourceRef =
+    def.source ?? officialSourceFor(code) ?? GENERIC_FALLBACK_SOURCE
+
   return {
     stateCode: code,
     stateName: def.name,
@@ -392,7 +410,7 @@ function toProfile(code: string, def: StateDef): StateLawProfile {
       ? { ammunitionRestrictions: def.ammunitionRestrictions }
       : {}),
     notes: def.notes,
-    source: def.source ?? DEFAULT_SOURCE,
+    source,
     lastVerified: def.lastVerified ?? DEFAULT_VERIFIED,
     confidence: def.confidence ?? DEFAULT_CONFIDENCE,
   }

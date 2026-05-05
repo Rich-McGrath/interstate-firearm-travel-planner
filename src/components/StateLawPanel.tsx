@@ -110,27 +110,52 @@ export default function StateLawPanel({
                 </ul>
               )}
 
-              {!simple && profile && (
-                <footer className="state-card__provenance">
-                  <span className="state-card__verified mono">
-                    Verified {formatVerifiedDate(profile.lastVerified)}
-                    {' · '}
-                    <a
-                      href={profile.source.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      {profile.source.label ?? 'source'}
-                    </a>
-                    {profile.source.type === 'secondary' && ' (secondary)'}
-                  </span>
-                  {isStale(profile.lastVerified) && (
-                    <span className="state-card__stale mono" title="Verification is over a year old">
-                      ⚠ Review recommended
+              {!simple && profile && (() => {
+                // confidence='high' is set only when an entry has been
+                // individually verified (currently TX, FL, MA, NY). For
+                // those, surface the verification date prominently. For
+                // every other state, show the source as a "look it up
+                // here" pointer instead of a verification claim — the
+                // information is a compilation, not a citation.
+                const individuallyVerified = profile.confidence === 'high'
+                return (
+                  <footer className="state-card__provenance">
+                    <span className="state-card__verified mono">
+                      {individuallyVerified ? (
+                        <>
+                          Verified {formatVerifiedDate(profile.lastVerified)} ·{' '}
+                          <a
+                            href={profile.source.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            {profile.source.label ?? 'source'}
+                          </a>
+                        </>
+                      ) : (
+                        <>
+                          Compiled summary · verify at{' '}
+                          <a
+                            href={profile.source.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            {profile.source.label ?? 'state source'}
+                          </a>
+                        </>
+                      )}
                     </span>
-                  )}
-                </footer>
-              )}
+                    {individuallyVerified && isStale(profile.lastVerified) && (
+                      <span
+                        className="state-card__stale mono"
+                        title="Verification is over a year old"
+                      >
+                        ⚠ Review recommended
+                      </span>
+                    )}
+                  </footer>
+                )
+              })()}
             </article>
           )
         })}
