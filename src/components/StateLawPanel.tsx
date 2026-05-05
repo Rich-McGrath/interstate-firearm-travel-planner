@@ -244,7 +244,11 @@ function stateSeverityScore(
 // Single-restriction rank used to order the items inside a state card.
 // Mirrors the per-state severity scoring above so the within-card order
 // matches the cross-state order: higher-rank items render earlier.
-function restrictionLevelRank(level: RestrictionResult['level']): number {
+//
+// Defensive default: any unrecognized level (e.g. if the type widens in
+// the future or stale data flows in) ranks at 0 so it sinks to the
+// bottom rather than producing NaN comparisons that destabilize sort.
+function restrictionLevelRank(level: RestrictionResult['level'] | string): number {
   switch (level) {
     case 'high':
       return 4
@@ -254,5 +258,7 @@ function restrictionLevelRank(level: RestrictionResult['level']): number {
       return 2
     case 'low':
       return 1
+    default:
+      return 0
   }
 }
