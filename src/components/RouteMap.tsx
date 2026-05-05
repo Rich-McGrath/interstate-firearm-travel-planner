@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import mapboxgl from 'mapbox-gl'
 import 'mapbox-gl/dist/mapbox-gl.css'
+import type { Topology } from 'topojson-specification'
 import type {
   ReciprocityResult,
   RestrictionResult,
@@ -55,12 +56,16 @@ const LYR_STOPS_CLUSTERS = 'suggested-stops-clusters'
 const LYR_STOPS_CLUSTER_COUNT = 'suggested-stops-cluster-count'
 const LYR_STOPS_POINTS = 'suggested-stops-points'
 
-// State-overlay layer IDs. Both layers query Mapbox's built-in `admin`
-// source (line geometry, no fills) and use a filter to highlight only
-// the relevant states. We draw two layers because the colors must
-// differ. Strict states render after duty states so the stricter
-// signal wins where a state qualifies for both.
+// State-overlay layer + source IDs. We back these with a GeoJSON
+// FeatureCollection of US state polygons (loaded from the public
+// `us-atlas` TopoJSON, converted client-side once on first render).
+// Two filtered layers — one for strict-policy states, one for
+// duty-to-inform states — share the source. Strict layer renders on
+// top so its color wins where a state qualifies for both.
+const SRC_STATES = 'us-states-src'
+const LYR_DUTY_FILL = 'duty-state-fill'
 const LYR_DUTY_OUTLINE = 'duty-state-outline'
+const LYR_STRICT_FILL = 'strict-state-fill'
 const LYR_STRICT_OUTLINE = 'strict-state-outline'
 
 export default function RouteMap({
@@ -186,7 +191,7 @@ export default function RouteMap({
     if (!map) return
     const apply = () => {
       drawRoute(map, route, reciprocity, restrictions)
-      drawStateOverlays(map, route.statesCrossed)
+      void drawStateOverlays(map, route.statesCrossed)
       drawTripMarkers(map, stops, tripMarkersRef)
       fitToRoute(map, route)
     }
@@ -303,25 +308,62 @@ function drawRoute(
   })
 }
 
-// Highlight state borders for any state on the route that triggers a
-// caution flag — either strict-policy (carry recognition is the issue)
-// or duty-to-inform (must volunteer carry status, or inform if asked).
-//
-// Implementation note: we leverage Mapbox's built-in `admin` source-layer
-// from the `composite` source that every default style ships with. The
-// admin layer is line-only — country/state/county borders, no fills.
-// We add two new layers that filter the same source by `iso_3166_2`,
-// with a thicker stroke and our caution colors. No external GeoJSON
-// needed; no extra network requests; no token-scope changes.
-function drawStateOverlays(
-  map: mapboxgl.Map,
-  routeStates: string[]
-) {
-  // Remove any prior overlay layers cleanly so re-renders don't stack.
-  for (const id of [LYR_DUTY_OUTLINE, LYR_STRICT_OUTLINE]) {
-    if (map.getLayer(id)) map.removeLayer(id)
-  }
+// Module-level cache of the converted state-polygon FeatureCollection.
+// us-atlas TopoJSON is fetched once on first map render and converted
+// to GeoJSON — subsequent maps reuse the cached object. The fetch
+// happens lazily so initial page load isn't blocked on this asset.
+let statePolygonsCache: GeoJSON.FeatureCollection | null = null
+let statePolygonsPromise: Promise<GeoJSON.FeatureCollection> | null = null
 
+// FIPS code -> USPS abbreviation. The us-atlas TopoJSON tags features
+// with FIPS codes; we want to filter by USPS so we can re-use the
+// existing routeStates list directly.
+const FIPS_TO_USPS: Record<string, string> = {
+  '01':'AL','02':'AK','04':'AZ','05':'AR','06':'CA','08':'CO','09':'CT','10':'DE',
+  '11':'DC','12':'FL','13':'GA','15':'HI','16':'ID','17':'IL','18':'IN','19':'IA',
+  '20':'KS','21':'KY','22':'LA','23':'ME','24':'MD','25':'MA','26':'MI','27':'MN',
+  '28':'MS','29':'MO','30':'MT','31':'NE','32':'NV','33':'NH','34':'NJ','35':'NM',
+  '36':'NY','37':'NC','38':'ND','39':'OH','40':'OK','41':'OR','42':'PA','44':'RI',
+  '45':'SC','46':'SD','47':'TN','48':'TX','49':'UT','50':'VT','51':'VA','53':'WA',
+  '54':'WV','55':'WI','56':'WY',
+}
+
+async function loadStatePolygons(): Promise<GeoJSON.FeatureCollection> {
+  if (statePolygonsCache) return statePolygonsCache
+  if (statePolygonsPromise) return statePolygonsPromise
+  statePolygonsPromise = (async () => {
+    // Lazy import keeps topojson-client out of the initial bundle.
+    const [topojson, resp] = await Promise.all([
+      import('topojson-client'),
+      fetch('/us-states-10m.json'),
+    ])
+    if (!resp.ok) throw new Error(`Failed to load state polygons: ${resp.status}`)
+    const topo = (await resp.json()) as Topology
+    const fc = topojson.feature(topo, topo.objects['states']!) as unknown as GeoJSON.FeatureCollection
+    // Tag every feature with a `usps` property derived from its FIPS id
+    // so layer filters can match by 2-letter state code.
+    for (const f of fc.features) {
+      const fips = String((f as GeoJSON.Feature & { id?: string | number }).id ?? '')
+      const padded = fips.padStart(2, '0')
+      const usps = FIPS_TO_USPS[padded]
+      if (usps && f.properties) f.properties['usps'] = usps
+    }
+    statePolygonsCache = fc
+    return fc
+  })()
+  return statePolygonsPromise
+}
+
+// Highlight entire state polygons for any state on the route that
+// triggers a caution flag — either strict-policy (carry recognition is
+// the issue) or duty-to-inform (must volunteer carry status, or inform
+// if asked).
+//
+// Implementation: a single GeoJSON source backed by the us-atlas state
+// polygons, with two filtered layers (one for duty, one for strict)
+// that paint a transparent fill plus a more visible outline. Strict
+// fill renders on top so it wins when a state qualifies as both.
+async function drawStateOverlays(map: mapboxgl.Map, routeStates: string[]) {
   // Classify route states. Strict wins over duty when both apply (e.g.
   // NJ qualifies as both restrictive AND duty-to-inform=manual_review;
   // we want it red, not orange).
@@ -333,61 +375,117 @@ function drawStateOverlays(
     const isStrict =
       !!profile.hasAssaultWeaponBan ||
       !!profile.hasSpecialTransportRules ||
-      profile.dutyToInform === 'manual_review' // proxy for restrictive policy
+      profile.dutyToInform === 'manual_review'
     const isDuty =
       profile.dutyToInform === 'must_inform' ||
       profile.dutyToInform === 'inform_if_asked'
-    if (isStrict) strict.push(`US-${code.toUpperCase()}`)
-    else if (isDuty) dutyOnly.push(`US-${code.toUpperCase()}`)
+    if (isStrict) strict.push(code.toUpperCase())
+    else if (isDuty) dutyOnly.push(code.toUpperCase())
   }
 
-  // The `admin` source-layer is part of `composite` in every Mapbox
-  // default style. `admin_level === 1` is states/provinces.
-  // `iso_3166_2` matches "US-XX" form. `worldview === 'all'` keeps the
-  // filter portable across worldview-specific tiles.
+  // Remove any prior overlay layers + source cleanly so re-renders
+  // don't stack and so updated routes pick up the right filters.
+  for (const id of [LYR_STRICT_OUTLINE, LYR_STRICT_FILL, LYR_DUTY_OUTLINE, LYR_DUTY_FILL]) {
+    if (map.getLayer(id)) map.removeLayer(id)
+  }
+  if (map.getSource(SRC_STATES)) map.removeSource(SRC_STATES)
+
+  // Nothing to highlight — done.
+  if (strict.length === 0 && dutyOnly.length === 0) return
+
+  let polygons: GeoJSON.FeatureCollection
+  try {
+    polygons = await loadStatePolygons()
+  } catch {
+    // If the static asset fails to load (404, network error), skip the
+    // overlay silently — map still works without it.
+    return
+  }
+  // The map may have been unmounted while we were awaiting the fetch.
+  if (!map.getStyle()) return
+
+  map.addSource(SRC_STATES, { type: 'geojson', data: polygons })
+
+  // Find a layer ID to insert *before* so our overlay sits below
+  // labels and route lines. Mapbox layers are drawn in order; we
+  // want fills under road labels and the route polyline.
+  const beforeLayerId = pickBeforeLayer(map)
+
   if (dutyOnly.length > 0) {
-    map.addLayer({
-      id: LYR_DUTY_OUTLINE,
-      type: 'line',
-      source: 'composite',
-      'source-layer': 'admin',
-      filter: [
-        'all',
-        ['==', ['get', 'admin_level'], 1],
-        ['in', ['get', 'iso_3166_2'], ['literal', dutyOnly]],
-      ],
-      layout: { 'line-cap': 'round', 'line-join': 'round' },
-      paint: {
-        'line-color': DUTY_STATE_COLOR,
-        'line-width': 4,
-        'line-opacity': 0.85,
-        'line-dasharray': [2, 2],
+    map.addLayer(
+      {
+        id: LYR_DUTY_FILL,
+        type: 'fill',
+        source: SRC_STATES,
+        filter: ['in', ['get', 'usps'], ['literal', dutyOnly]],
+        paint: {
+          'fill-color': DUTY_STATE_COLOR,
+          'fill-opacity': 0.18,
+        },
       },
-    })
+      beforeLayerId
+    )
+    map.addLayer(
+      {
+        id: LYR_DUTY_OUTLINE,
+        type: 'line',
+        source: SRC_STATES,
+        filter: ['in', ['get', 'usps'], ['literal', dutyOnly]],
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: {
+          'line-color': DUTY_STATE_COLOR,
+          'line-width': 2,
+          'line-opacity': 0.85,
+          'line-dasharray': [2, 2],
+        },
+      },
+      beforeLayerId
+    )
   }
 
   if (strict.length > 0) {
-    map.addLayer({
-      id: LYR_STRICT_OUTLINE,
-      type: 'line',
-      source: 'composite',
-      'source-layer': 'admin',
-      filter: [
-        'all',
-        ['==', ['get', 'admin_level'], 1],
-        ['in', ['get', 'iso_3166_2'], ['literal', strict]],
-      ],
-      layout: { 'line-cap': 'round', 'line-join': 'round' },
-      paint: {
-        'line-color': STRICT_STATE_COLOR,
-        'line-width': 5,
-        'line-opacity': 0.95,
-        // Solid line — strict states get the unbroken outline since
-        // they're the more serious signal; the dashed duty line keeps
-        // them visually distinct at a glance.
+    map.addLayer(
+      {
+        id: LYR_STRICT_FILL,
+        type: 'fill',
+        source: SRC_STATES,
+        filter: ['in', ['get', 'usps'], ['literal', strict]],
+        paint: {
+          'fill-color': STRICT_STATE_COLOR,
+          'fill-opacity': 0.22,
+        },
       },
-    })
+      beforeLayerId
+    )
+    map.addLayer(
+      {
+        id: LYR_STRICT_OUTLINE,
+        type: 'line',
+        source: SRC_STATES,
+        filter: ['in', ['get', 'usps'], ['literal', strict]],
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: {
+          'line-color': STRICT_STATE_COLOR,
+          'line-width': 3,
+          'line-opacity': 0.95,
+        },
+      },
+      beforeLayerId
+    )
   }
+}
+
+// Pick a layer to insert state-overlay fills before. Goal: overlay sits
+// above background/water but below labels and the route polyline. We
+// look for the first symbol (label) layer; falling back to inserting
+// at the top if none is found (which is harmless — it'll just overlay
+// labels too).
+function pickBeforeLayer(map: mapboxgl.Map): string | undefined {
+  const layers = map.getStyle()?.layers ?? []
+  for (const l of layers) {
+    if (l.type === 'symbol') return l.id
+  }
+  return undefined
 }
 
 function drawTripMarkers(
