@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Disclaimer from './components/Disclaimer'
 import TripForm from './components/TripForm'
 import RouteSummary from './components/RouteSummary'
@@ -6,27 +6,69 @@ import StateLawPanel from './components/StateLawPanel'
 import FopaPanel from './components/FopaPanel'
 import StopsPanel from './components/StopsPanel'
 import ExportPanel from './components/ExportPanel'
-import { MOCK_ROUTES } from './data/mockRoutes'
 import { MOCK_STOPS } from './data/mockStops'
 import { evaluateFopa } from './rules/evaluateFopa'
 import { evaluateReciprocity } from './rules/evaluateReciprocity'
 import { evaluateRestrictions } from './rules/evaluateRestrictions'
 import { scoreRouteRisk } from './rules/scoreRouteRisk'
 import { generateChecklist } from './utils/checklist'
-import type { TripInput } from './types/domain'
+import { getDirections, type DirectionsRoute } from './services/mapboxClient'
+import type { RouteOption, TripInput } from './types/domain'
 
 const LEGAL_DISCLAIMER =
   'Informational only. Not legal advice. No guarantee of compliance, reciprocity, or personal safety.'
 
+function toRouteOption(r: DirectionsRoute, idx: number): RouteOption {
+  return {
+    id: `route-${idx}`,
+    name: idx === 0 ? 'Primary route' : `Alternative route ${idx}`,
+    polyline: r.geometry,
+    distanceMiles: r.distanceMiles,
+    durationMinutes: r.durationMinutes,
+    statesCrossed: r.statesCrossed,
+    waypoints: [],
+    riskScore: 0,
+    riskLevel: 'manual_review',
+    riskReasons: [],
+  }
+}
+
 export default function App() {
   const [trip, setTrip] = useState<TripInput | null>(null)
-  const [selectedRouteId, setSelectedRouteId] = useState<string>(MOCK_ROUTES[0]?.id ?? '')
+  const [routes, setRoutes] = useState<RouteOption[]>([])
+  const [routesLoading, setRoutesLoading] = useState(false)
+  const [routesError, setRoutesError] = useState<string | null>(null)
+  const [selectedRouteId, setSelectedRouteId] = useState<string>('')
   const [selectedStopIds, setSelectedStopIds] = useState<string[]>([])
 
+  // Fetch directions from the Pages Function whenever a trip is submitted.
+  useEffect(() => {
+    if (!trip || !trip.originCoords || !trip.destinationCoords) return
+    let cancelled = false
+    setRoutesLoading(true)
+    setRoutesError(null)
+    getDirections(trip.originCoords, trip.destinationCoords)
+      .then((rs) => {
+        if (cancelled) return
+        const opts = rs.map(toRouteOption)
+        setRoutes(opts)
+        setSelectedRouteId(opts[0]?.id ?? '')
+        if (opts.length === 0) setRoutesError('No route returned for this origin and destination.')
+      })
+      .catch((err: Error) => {
+        if (cancelled) return
+        setRoutesError(err.message || 'Could not load route.')
+        setRoutes([])
+      })
+      .finally(() => !cancelled && setRoutesLoading(false))
+    return () => {
+      cancelled = true
+    }
+  }, [trip])
+
   const evaluation = useMemo(() => {
-    if (!trip) return null
-    const route =
-      MOCK_ROUTES.find((r) => r.id === selectedRouteId) ?? MOCK_ROUTES[0]
+    if (!trip || routes.length === 0) return null
+    const route = routes.find((r) => r.id === selectedRouteId) ?? routes[0]
     if (!route) return null
 
     const fopa = evaluateFopa(trip)
@@ -42,7 +84,7 @@ export default function App() {
     const risk = scoreRouteRisk({ fopa, reciprocity, restrictions })
     const checklist = generateChecklist({ trip, fopa, reciprocity, restrictions })
     return { route, fopa, reciprocity, restrictions, risk, checklist }
-  }, [trip, selectedRouteId])
+  }, [trip, routes, selectedRouteId])
 
   function toggleStop(id: string) {
     setSelectedStopIds((prev) =>
@@ -71,10 +113,22 @@ export default function App() {
 
         <TripForm onSubmit={setTrip} />
 
+        {routesLoading && (
+          <section className="card">
+            <p className="muted">Computing route…</p>
+          </section>
+        )}
+
+        {routesError && !routesLoading && (
+          <section className="card">
+            <p className="warning-list-inline">Could not load route: {routesError}</p>
+          </section>
+        )}
+
         {evaluation && trip && (
           <>
             <RouteSummary
-              routes={MOCK_ROUTES}
+              routes={routes}
               selectedId={evaluation.route.id}
               onSelect={setSelectedRouteId}
               computedRiskLevel={evaluation.risk.level}

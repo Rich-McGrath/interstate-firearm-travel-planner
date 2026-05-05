@@ -779,21 +779,82 @@ p {
    Mobile
    ===================================================================== */
 
+/* =====================================================================
+   Autocomplete dropdown
+   ===================================================================== */
+
+.autocomplete {
+  position: relative;
+}
+
+.autocomplete__menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  margin: 0.25rem 0 0;
+  padding: 0.25rem;
+  list-style: none;
+  background: #fffefb;
+  border: 1px solid var(--rule-2);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.autocomplete__item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.95rem;
+  color: var(--ink);
+}
+
+.autocomplete__item.is-active,
+.autocomplete__item:hover {
+  background: var(--paper-2);
+}
+
+.autocomplete__label {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.autocomplete__state {
+  font-size: 0.78rem;
+  color: var(--ink-3);
+  padding: 0.1rem 0.35rem;
+  background: var(--paper-2);
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.autocomplete__loading {
+  padding: 0.55rem 0.7rem;
+  color: var(--ink-3);
+  font-style: italic;
+  font-size: 0.9rem;
+}
+
+.warning-list-inline {
+  background: var(--risk-high-bg);
+  color: var(--risk-high);
+  padding: 0.6rem 0.85rem;
+  border-radius: var(--radius);
+  margin: 0;
+}
+
 @media (max-width: 540px) {
-  .app__header {
-    padding: 1.25rem 1rem;
-  }
-  .app__brand {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.6rem;
-  }
-  .app__main {
-    padding: 1rem;
-    gap: 1rem;
-  }
-  .card,
-  .trip-form {
-    padding: 1rem;
-  }
+  .app__header { padding: 1.25rem 1rem; }
+  .app__brand { flex-direction: column; align-items: flex-start; gap: 0.6rem; }
+  .app__main { padding: 1rem; gap: 1rem; }
+  .card, .trip-form { padding: 1rem; }
 }

@@ -67,8 +67,8 @@ export function evaluateFopa(trip: TripInput): FopaAnalysis {
   // Origin and destination lawful possession — we only know the state-level
   // seed dataset, not the user's specific status. Always raise this as a
   // condition the user must satisfy themselves.
-  const originState = parseStateCode(trip.origin)
-  const destinationState = parseStateCode(trip.destination)
+  const originState = trip.originStateCode ?? parseStateCode(trip.origin)
+  const destinationState = trip.destinationStateCode ?? parseStateCode(trip.destination)
 
   if (!originState || !destinationState) {
     warnings.push(

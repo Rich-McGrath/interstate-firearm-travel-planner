@@ -20,9 +20,21 @@ export type SourceType = 'official' | 'secondary' | 'missing'
 export type StopCategory = 'gas' | 'food' | 'gas_food'
 export type StopLabel = 'recommended' | 'better_traffic' | 'manual_review'
 
+export interface Coordinate {
+  lng: number
+  lat: number
+}
+
 export interface TripInput {
   origin: string
   destination: string
+  // Set when the user picks an autocomplete suggestion. Used by the
+  // directions API to compute a real route. If absent, the trip is
+  // submitted with text-only addresses and the directions call is skipped.
+  originCoords?: Coordinate
+  destinationCoords?: Coordinate
+  originStateCode?: string
+  destinationStateCode?: string
   hasPermit: boolean
   permitState?: string
   firearmType: FirearmType

@@ -6,6 +6,8 @@ function baseTrip(overrides: Partial<TripInput> = {}): TripInput {
   return {
     origin: 'Boston, MA',
     destination: 'Pittsburgh, PA',
+    originStateCode: 'MA',
+    destinationStateCode: 'PA',
     hasPermit: true,
     permitState: 'MA',
     firearmType: 'handgun',
@@ -59,7 +61,12 @@ describe('evaluateFopa', () => {
 
   it('returns manual_review when origin/destination state cannot be parsed', () => {
     const out = evaluateFopa(
-      baseTrip({ origin: 'unknown place', destination: 'somewhere else' })
+      baseTrip({
+        origin: 'unknown place',
+        destination: 'somewhere else',
+        originStateCode: undefined,
+        destinationStateCode: undefined,
+      })
     )
     expect(out.qualifiesPotentially).toBe('manual_review')
   })

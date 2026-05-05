@@ -1,9 +1,12 @@
 import { useState } from 'react'
 import type {
+  Coordinate,
   FirearmType,
   TransportItem,
   TripInput,
 } from '../types/domain'
+import AddressAutocomplete from './AddressAutocomplete'
+import type { GeocodeSuggestion } from '../services/mapboxClient'
 
 interface Props {
   onSubmit: (trip: TripInput) => void
@@ -24,8 +27,18 @@ const ALL_TRANSPORT_ITEMS: { value: TransportItem; label: string }[] = [
 const FIREARM_TYPES: FirearmType[] = ['handgun', 'rifle', 'shotgun', 'ar_style', 'other']
 
 export default function TripForm({ onSubmit, initial }: Props) {
-  const [origin, setOrigin] = useState(initial?.origin ?? 'Boston, MA')
-  const [destination, setDestination] = useState(initial?.destination ?? 'Pittsburgh, PA')
+  const [origin, setOrigin] = useState(initial?.origin ?? '')
+  const [originCoords, setOriginCoords] = useState<Coordinate | undefined>(initial?.originCoords)
+  const [originState, setOriginState] = useState<string | undefined>(initial?.originStateCode)
+
+  const [destination, setDestination] = useState(initial?.destination ?? '')
+  const [destinationCoords, setDestinationCoords] = useState<Coordinate | undefined>(
+    initial?.destinationCoords
+  )
+  const [destinationState, setDestinationState] = useState<string | undefined>(
+    initial?.destinationStateCode
+  )
+
   const [hasPermit, setHasPermit] = useState(initial?.hasPermit ?? true)
   const [permitState, setPermitState] = useState(initial?.permitState ?? 'MA')
   const [firearmType, setFirearmType] = useState<FirearmType>(initial?.firearmType ?? 'handgun')
@@ -47,6 +60,28 @@ export default function TripForm({ onSubmit, initial }: Props) {
 
   const [errors, setErrors] = useState<string[]>([])
 
+  function handleOriginChange(label: string, suggestion?: GeocodeSuggestion) {
+    setOrigin(label)
+    if (suggestion) {
+      setOriginCoords({ lng: suggestion.lng, lat: suggestion.lat })
+      setOriginState(suggestion.stateCode)
+    } else {
+      setOriginCoords(undefined)
+      setOriginState(undefined)
+    }
+  }
+
+  function handleDestinationChange(label: string, suggestion?: GeocodeSuggestion) {
+    setDestination(label)
+    if (suggestion) {
+      setDestinationCoords({ lng: suggestion.lng, lat: suggestion.lat })
+      setDestinationState(suggestion.stateCode)
+    } else {
+      setDestinationCoords(undefined)
+      setDestinationState(undefined)
+    }
+  }
+
   function toggleItem(item: TransportItem) {
     setItems((prev) =>
       prev.includes(item) ? prev.filter((i) => i !== item) : [...prev, item]
@@ -58,6 +93,9 @@ export default function TripForm({ onSubmit, initial }: Props) {
     const errs: string[] = []
     if (!origin.trim()) errs.push('Origin is required.')
     if (!destination.trim()) errs.push('Destination is required.')
+    if (!originCoords) errs.push('Pick a suggestion from the Origin dropdown so we can compute a route.')
+    if (!destinationCoords)
+      errs.push('Pick a suggestion from the Destination dropdown so we can compute a route.')
     if (hasPermit && !permitState.trim()) errs.push('Permit state is required when a permit is reported.')
     let mag: number | undefined
     if (magazineCapacity.trim()) {
@@ -76,6 +114,10 @@ export default function TripForm({ onSubmit, initial }: Props) {
     onSubmit({
       origin: origin.trim(),
       destination: destination.trim(),
+      ...(originCoords ? { originCoords } : {}),
+      ...(destinationCoords ? { destinationCoords } : {}),
+      ...(originState ? { originStateCode: originState } : {}),
+      ...(destinationState ? { destinationStateCode: destinationState } : {}),
       hasPermit,
       ...(hasPermit ? { permitState: permitState.trim().toUpperCase() } : {}),
       firearmType,
@@ -94,25 +136,18 @@ export default function TripForm({ onSubmit, initial }: Props) {
       <h2 className="trip-form__title">Trip details</h2>
 
       <div className="form-grid">
-        <label className="field">
-          <span>Origin</span>
-          <input
-            type="text"
-            value={origin}
-            onChange={(e) => setOrigin(e.target.value)}
-            placeholder="e.g. Boston, MA"
-          />
-        </label>
-
-        <label className="field">
-          <span>Destination</span>
-          <input
-            type="text"
-            value={destination}
-            onChange={(e) => setDestination(e.target.value)}
-            placeholder="e.g. Pittsburgh, PA"
-          />
-        </label>
+        <AddressAutocomplete
+          label="Origin"
+          value={origin}
+          onChange={handleOriginChange}
+          placeholder="Start typing a city or address"
+        />
+        <AddressAutocomplete
+          label="Destination"
+          value={destination}
+          onChange={handleDestinationChange}
+          placeholder="Start typing a city or address"
+        />
 
         <label className="field">
           <span>Has carry permit?</span>
