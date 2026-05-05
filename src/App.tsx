@@ -1,11 +1,11 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Disclaimer from './components/Disclaimer'
 import TripForm from './components/TripForm'
 import RouteSummary from './components/RouteSummary'
 import StateLawPanel from './components/StateLawPanel'
 import DutySummaryPanel from './components/DutySummaryPanel'
 import FopaPanel from './components/FopaPanel'
-import StopsPanel from './components/StopsPanel'
+import StopsSection from './components/StopsSection'
 import ExportPanel from './components/ExportPanel'
 import RecentTripsMenu from './components/RecentTripsMenu'
 import TrustModeToggle from './components/TrustModeToggle'
@@ -41,10 +41,6 @@ import {
   type StopRecommendation,
   type TripInput,
 } from './types/domain'
-
-// Mapbox GL is large (~550 KB gzipped). Lazy-load it so the initial
-// bundle stays light; the map chunk fetches once a route is computed.
-const RouteMap = lazy(() => import('./components/RouteMap'))
 
 const LEGAL_DISCLAIMER =
   'Informational only. Not legal advice. No guarantee of compliance, reciprocity, or personal safety.'
@@ -301,37 +297,11 @@ export default function App() {
                 computedRiskReasons={evaluation.risk.reasons}
               />
 
-              <Suspense
-                fallback={
-                  <section className="card">
-                    <p className="muted">Loading map…</p>
-                  </section>
-                }
-              >
-                <RouteMap
-                  route={evaluation.route}
-                  stops={trip.stops}
-                  reciprocity={evaluation.reciprocity}
-                  restrictions={evaluation.restrictions}
-                  suggestedStops={filteredStops}
-                  selectedStopIds={selectedStopIds}
-                  hoveredStopId={hoveredStopId}
-                  onToggleStop={toggleStop}
-                  onHoverStop={setHoveredStopId}
-                />
-              </Suspense>
-
-              <FopaPanel fopa={evaluation.fopa} />
-
-              <DutySummaryPanel routeStates={evaluation.route.statesCrossed} />
-
-              <StateLawPanel
+              <StopsSection
+                route={evaluation.route}
+                tripStops={trip.stops}
                 reciprocity={evaluation.reciprocity}
                 restrictions={evaluation.restrictions}
-                routeStates={evaluation.route.statesCrossed}
-              />
-
-              <StopsPanel
                 scored={filteredStops}
                 totalCount={enrichedStops.length}
                 loading={stopsLoading}
@@ -341,6 +311,16 @@ export default function App() {
                 hoveredStopId={hoveredStopId}
                 onToggleSelect={toggleStop}
                 onHoverStop={setHoveredStopId}
+              />
+
+              <FopaPanel fopa={evaluation.fopa} />
+
+              <DutySummaryPanel routeStates={evaluation.route.statesCrossed} />
+
+              <StateLawPanel
+                reciprocity={evaluation.reciprocity}
+                restrictions={evaluation.restrictions}
+                routeStates={evaluation.route.statesCrossed}
               />
 
               <ExportPanel
