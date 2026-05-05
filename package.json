@@ -8,7 +8,9 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "check-data": "node scripts/check-stale-data.mjs",
+    "check-data:warn": "node scripts/check-stale-data.mjs --warn-only"
   },
   "dependencies": {
     "mapbox-gl": "^3.23.1",

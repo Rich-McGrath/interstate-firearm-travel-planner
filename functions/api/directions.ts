@@ -102,12 +102,24 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
 
   // 2. For each route, sample points along the geometry and reverse-geocode
   //    to extract the ordered list of states crossed. Sample count scales
-  //    with the number of stops to maintain coverage on long multi-stop
-  //    trips.
-  const sampleCount = Math.min(20, 8 + coords.length * 2)
-
+  //    with route length so that long routes don't undersample (causing
+  //    states like Indiana or Missouri — which a route may only briefly
+  //    transit — to be missed entirely). Mapbox's reverse-geocode is rate
+  //    limited so we keep the cap reasonable; ~one sample every 50 miles
+  //    is dense enough to catch a thin transit through any state, and on
+  //    a 3000-mile cross-country route that's 60 calls per route, well
+  //    within Mapbox's free-tier limits.
   const routes: DirectionsResult[] = []
   for (const r of dirData.routes.slice(0, 2)) {
+    const distanceMiles = r.distance / 1609.34
+    // Roughly 1 sample per 50 miles; floor at 12 (short trips still
+    // need decent coverage), cap at 80 (don't blow up on 4000-mile
+    // routes). Scales with stop count too, since waypoints can add
+    // detours that cross extra states.
+    const sampleCount = Math.max(
+      12,
+      Math.min(80, Math.round(distanceMiles / 50) + coords.length * 2)
+    )
     const points = decodePolyline(r.geometry)
     const sampleIndices = sampleIndicesAlong(points.length, sampleCount)
     const samples: RouteSample[] = []

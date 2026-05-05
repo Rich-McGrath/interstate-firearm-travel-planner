@@ -43,6 +43,40 @@ export default function StateLawPanel({
     return a.localeCompare(b)
   })
 
+  // Summarize freshness across the states on this route. The oldest
+  // entry's date governs the header line; the staleness count drives
+  // the optional warning. Helps users gauge how trustworthy the panel
+  // is overall, complementing the per-state "Verified [date]" or
+  // "Compiled summary" footer text.
+  const reviewedSummary = (() => {
+    let oldestDate: Date | null = null
+    let staleCount = 0
+    let totalChecked = 0
+    const STALE_MONTHS = 12
+    const now = new Date()
+    for (const code of routeStates) {
+      const profile = getStateProfile(code.toUpperCase())
+      if (!profile?.lastVerified) continue
+      const d = new Date(profile.lastVerified)
+      if (isNaN(d.getTime())) continue
+      totalChecked++
+      if (!oldestDate || d < oldestDate) oldestDate = d
+      const monthsAgo =
+        (now.getFullYear() - d.getFullYear()) * 12 + (now.getMonth() - d.getMonth())
+      if (monthsAgo >= STALE_MONTHS) staleCount++
+    }
+    if (!oldestDate || totalChecked === 0) return null
+    return {
+      oldestDate,
+      staleCount,
+      totalChecked,
+      formatted: oldestDate.toLocaleDateString(undefined, {
+        month: 'long',
+        year: 'numeric',
+      }),
+    }
+  })()
+
   return (
     <section className="card">
       <header className="card__header">
@@ -183,6 +217,28 @@ export default function StateLawPanel({
           )
         })}
       </div>
+
+      {reviewedSummary && (
+        <footer className="state-analysis__review-footer">
+          <span className="muted small">
+            Dataset last reviewed: {reviewedSummary.formatted}
+            {reviewedSummary.staleCount > 0 && (
+              <>
+                {' · '}
+                <span className="state-analysis__stale-count">
+                  ⚠ {reviewedSummary.staleCount} of {reviewedSummary.totalChecked}{' '}
+                  state{reviewedSummary.totalChecked === 1 ? '' : 's'} on this route{' '}
+                  {reviewedSummary.staleCount === 1 ? 'has' : 'have'} not been
+                  reviewed in over a year
+                </span>
+              </>
+            )}
+          </span>
+          <span className="muted small">
+            See <code>src/data/README.md</code> for the update workflow.
+          </span>
+        </footer>
+      )}
     </section>
   )
 }

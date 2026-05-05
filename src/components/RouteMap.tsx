@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import mapboxgl from 'mapbox-gl'
 import 'mapbox-gl/dist/mapbox-gl.css'
 import type { Topology } from 'topojson-specification'
@@ -88,6 +88,11 @@ export default function RouteMap({
   const mapRef = useRef<mapboxgl.Map | null>(null)
   const tripMarkersRef = useRef<mapboxgl.Marker[]>([])
   const popupRef = useRef<mapboxgl.Popup | null>(null)
+
+  // Whether the "How stops are chosen" explainer is open. Defaults
+  // closed so the map header stays compact. Persisted nowhere — it's
+  // disposable UI state.
+  const [explainerOpen, setExplainerOpen] = useState(false)
 
   // Refs hold the latest closure-bound props/callbacks so the map's
   // event handlers (registered once at init) see current data without
@@ -217,7 +222,7 @@ export default function RouteMap({
   if (!PUBLIC_TOKEN) {
     return (
       <section className="card">
-        <header className="card__header"><h2>Route map</h2></header>
+        <header className="card__header"><h2>Route Map</h2></header>
         <p className="warning-list-inline">
           Map unavailable: <code>VITE_MAPBOX_PUBLIC_TOKEN</code> is not set in the build
           environment. Add it in Cloudflare Pages → Settings → Variables and Secrets,
@@ -230,7 +235,7 @@ export default function RouteMap({
   return (
     <section className="card route-map-card">
       <header className="card__header">
-        <h2>Route map</h2>
+        <h2>Route Map</h2>
         <span className="route-map-legend">
           <span className="route-map-legend__item"><i style={{ background: RISK_COLORS.low }} />Lower</span>
           <span className="route-map-legend__item"><i style={{ background: RISK_COLORS.caution }} />Caution</span>
@@ -255,6 +260,71 @@ export default function RouteMap({
           </span>
         </span>
       </header>
+
+      {/* Collapsible explainer: how stops are chosen + scored. Closed
+          by default. Helps users understand the logic without cluttering
+          the visible UI for those who don't care to dig in. */}
+      <div className="route-map__explainer">
+        <button
+          type="button"
+          className="route-map__explainer-toggle btn--ghost btn--small"
+          onClick={() => setExplainerOpen((v) => !v)}
+          aria-expanded={explainerOpen}
+        >
+          <span className="mono">ⓘ</span> How stops are chosen{' '}
+          <span aria-hidden="true">{explainerOpen ? '▴' : '▾'}</span>
+        </button>
+        {explainerOpen && (
+          <div className="route-map__explainer-body">
+            <p>
+              Suggested refueling stops are sourced from Mapbox along the route,
+              filtered to gas stations and combination gas/food stops, then ranked
+              by:
+            </p>
+            <ul>
+              <li>
+                <strong>Distance off route</strong> — closer to the route line beats
+                further afield.
+              </li>
+              <li>
+                <strong>Major-brand chain</strong> — recognizable chains
+                (Buc-ee&rsquo;s, Pilot, Love&rsquo;s, Sheetz, etc.) score higher
+                than unbranded options.
+              </li>
+              <li>
+                <strong>Commercial corridor</strong> — POI clusters near major
+                exits get a small bonus.
+              </li>
+              <li>
+                <strong>Category match</strong> — gas + food (one stop, two
+                purposes) outranks gas-only.
+              </li>
+            </ul>
+            <p>
+              <strong>Fuel-aware suggestions</strong> appear when your active
+              vehicle profile has MPG and tank size set:
+            </p>
+            <ul>
+              <li>
+                <strong>⛽ Auto-added</strong> (red border) — a top-off recommended
+                before crossing into a strict state, so you can pass through
+                without stopping there. These are added to your trip
+                automatically; remove them if you prefer.
+              </li>
+              <li>
+                <strong>⛽ Suggested</strong> (cyan border) — a routine fill-up
+                when estimated remaining range falls into the 30-60 mile window.
+                Click <em>Add to trip</em> to accept.
+              </li>
+            </ul>
+            <p className="muted small">
+              Stop ratings, hours, and reviews aren&rsquo;t available from the
+              Mapbox tilequery API — those signals don&rsquo;t feed the score.
+            </p>
+          </div>
+        )}
+      </div>
+
       <div className="route-map" ref={containerRef} />
       {suggestedStops.length > 0 && (
         <p className="route-map__hint muted small">
@@ -437,7 +507,13 @@ async function drawStateOverlays(map: mapboxgl.Map, routeStates: string[]) {
         filter: ['in', ['get', 'usps'], ['literal', lower]],
         paint: {
           'fill-color': LOWER_STATE_COLOR,
-          'fill-opacity': 0.08,
+          // 12% opacity — bumped from 8% because the dark-theme map
+          // background washed out the green at 8% to the point where
+          // users couldn't tell whether a state had been classified
+          // at all. 12% reads as a subtle but visible tint while
+          // still being clearly subordinate to the 18-22% strict/duty
+          // fills.
+          'fill-opacity': 0.12,
         },
       },
       beforeLayerId
@@ -452,7 +528,7 @@ async function drawStateOverlays(map: mapboxgl.Map, routeStates: string[]) {
         paint: {
           'line-color': LOWER_STATE_COLOR,
           'line-width': 1.5,
-          'line-opacity': 0.65,
+          'line-opacity': 0.7,
         },
       },
       beforeLayerId
