@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import Disclaimer from './components/Disclaimer'
 import TripForm from './components/TripForm'
 import RouteSummary from './components/RouteSummary'
@@ -20,6 +20,10 @@ import {
   type TripInput,
 } from './types/domain'
 
+// Mapbox GL is large (~550 KB gzipped). Lazy-load it so the initial
+// bundle stays light; the map chunk fetches once a route is computed.
+const RouteMap = lazy(() => import('./components/RouteMap'))
+
 const LEGAL_DISCLAIMER =
   'Informational only. Not legal advice. No guarantee of compliance, reciprocity, or personal safety.'
 
@@ -35,6 +39,7 @@ function toRouteOption(r: DirectionsRoute, idx: number): RouteOption {
     riskScore: 0,
     riskLevel: 'manual_review',
     riskReasons: [],
+    samples: r.samples,
   }
 }
 
@@ -157,6 +162,21 @@ export default function App() {
               computedRiskScore={evaluation.risk.score}
               computedRiskReasons={evaluation.risk.reasons}
             />
+
+            <Suspense
+              fallback={
+                <section className="card">
+                  <p className="muted">Loading map…</p>
+                </section>
+              }
+            >
+              <RouteMap
+                route={evaluation.route}
+                stops={trip.stops}
+                reciprocity={evaluation.reciprocity}
+                restrictions={evaluation.restrictions}
+              />
+            </Suspense>
 
             <FopaPanel fopa={evaluation.fopa} />
 

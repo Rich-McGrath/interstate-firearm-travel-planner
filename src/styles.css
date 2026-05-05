@@ -1234,6 +1234,122 @@ p { margin: 0 0 0.8em; color: var(--cream-1); }
 
 
 /* =====================================================================
+   Route map
+   ===================================================================== */
+
+.route-map-card .card__header {
+  flex-wrap: wrap;
+  row-gap: 0.5rem;
+}
+
+.route-map {
+  width: 100%;
+  height: 460px;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--ink-2);
+  border: 1px solid var(--ink-rule);
+}
+
+@media (max-width: 720px) {
+  .route-map { height: 360px; }
+}
+
+.route-map-legend {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.55rem 0.85rem;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--cream-2);
+  letter-spacing: 0.04em;
+}
+
+.route-map-legend__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  text-transform: uppercase;
+}
+
+.route-map-legend__item i {
+  display: inline-block;
+  width: 14px;
+  height: 3px;
+  border-radius: 1px;
+}
+
+/* Map pin (custom marker element) */
+.map-pin {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--mono);
+  font-weight: 700;
+  font-size: 0.78rem;
+  color: var(--ink-0);
+  border: 2px solid var(--ink-0);
+  box-shadow: 0 0 0 2px var(--amber), 0 4px 10px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+  transform: translateY(-2px);
+  transition: transform 0.15s;
+}
+
+.map-pin:hover { transform: translateY(-4px) scale(1.05); }
+
+/* Mapbox popup (override their defaults to fit the dark theme) */
+.mapboxgl-popup-content {
+  background: var(--ink-2) !important;
+  color: var(--cream-0) !important;
+  border: 1px solid var(--ink-rule-2);
+  padding: 0.55rem 0.75rem !important;
+  border-radius: var(--radius) !important;
+  font-family: var(--serif-body);
+  font-size: 0.88rem;
+}
+
+.mapboxgl-popup-tip {
+  border-top-color: var(--ink-2) !important;
+  border-bottom-color: var(--ink-2) !important;
+}
+
+.map-popup__role {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--amber);
+  margin-bottom: 0.15rem;
+}
+
+.map-popup__label {
+  color: var(--cream-0);
+}
+
+/* Mapbox controls — match the dark UI */
+.mapboxgl-ctrl-group {
+  background: var(--ink-2) !important;
+  border: 1px solid var(--ink-rule) !important;
+}
+.mapboxgl-ctrl-group button {
+  background-color: transparent !important;
+}
+.mapboxgl-ctrl-group button:hover {
+  background-color: var(--ink-3) !important;
+}
+.mapboxgl-ctrl-group button .mapboxgl-ctrl-icon {
+  filter: invert(0.85);
+}
+.mapboxgl-ctrl-attrib {
+  background: rgba(10, 13, 18, 0.7) !important;
+  color: var(--cream-2) !important;
+}
+.mapboxgl-ctrl-attrib a { color: var(--amber-2) !important; }
+
+/* =====================================================================
    Mobile
    ===================================================================== */
 

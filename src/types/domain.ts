@@ -74,6 +74,13 @@ export interface Waypoint {
   lng: number
 }
 
+export interface RouteSampleClient {
+  polylineIndex: number
+  lng: number
+  lat: number
+  stateCode?: string
+}
+
 export interface RouteOption {
   id: string
   name: string
@@ -85,6 +92,7 @@ export interface RouteOption {
   riskScore: number
   riskLevel: RiskLevel
   riskReasons: string[]
+  samples: RouteSampleClient[]
 }
 
 export interface StateLawProfile {

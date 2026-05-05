@@ -8,11 +8,19 @@ export interface GeocodeSuggestion {
   stateCode?: string
 }
 
+export interface RouteSample {
+  polylineIndex: number
+  lng: number
+  lat: number
+  stateCode?: string
+}
+
 export interface DirectionsRoute {
   distanceMiles: number
   durationMinutes: number
   statesCrossed: string[]
   geometry: string
+  samples: RouteSample[]
 }
 
 export async function geocode(query: string, signal?: AbortSignal): Promise<GeocodeSuggestion[]> {

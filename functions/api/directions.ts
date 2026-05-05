@@ -26,11 +26,23 @@ interface ReverseResponse {
   features: ReverseFeature[]
 }
 
+export interface RouteSample {
+  // 0-based index into the decoded polyline points array
+  polylineIndex: number
+  lng: number
+  lat: number
+  stateCode?: string
+}
+
 export interface DirectionsResult {
   distanceMiles: number
   durationMinutes: number
   statesCrossed: string[]
   geometry: string
+  // Sampled points along the route with their state assignments. The
+  // client splits the polyline at sample boundaries to color segments
+  // by state.
+  samples: RouteSample[]
 }
 
 const ALLOWED_ORIGINS_RE = /^https:\/\/([\w-]+\.)?pages\.dev$|^http:\/\/localhost(:\d+)?$/
@@ -97,17 +109,36 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   const routes: DirectionsResult[] = []
   for (const r of dirData.routes.slice(0, 2)) {
     const points = decodePolyline(r.geometry)
-    const samples = samplePoints(points, sampleCount)
-    const states = await extractStatesAlongPath(samples, env.MAPBOX_TOKEN)
+    const sampleIndices = sampleIndicesAlong(points.length, sampleCount)
+    const samples: RouteSample[] = []
+    const states: string[] = []
+    for (const idx of sampleIndices) {
+      const [lng, lat] = points[idx]!
+      // eslint-disable-next-line no-await-in-loop
+      const stateCode = await reverseGeocodeState(lng, lat, env.MAPBOX_TOKEN)
+      const sample: RouteSample = { polylineIndex: idx, lng, lat }
+      if (stateCode) {
+        sample.stateCode = stateCode
+        if (states[states.length - 1] !== stateCode) states.push(stateCode)
+      }
+      samples.push(sample)
+    }
     routes.push({
       distanceMiles: Math.round(r.distance / 1609.34),
       durationMinutes: Math.round(r.duration / 60),
       statesCrossed: states,
       geometry: r.geometry,
+      samples,
     })
   }
 
   return json({ routes })
+}
+
+function sampleIndicesAlong(total: number, count: number): number[] {
+  if (total <= count) return Array.from({ length: total }, (_, i) => i)
+  const step = (total - 1) / (count - 1)
+  return Array.from({ length: count }, (_, i) => Math.round(i * step))
 }
 
 // ---------------------------------------------------------------------------
@@ -169,30 +200,6 @@ function decodePolyline(str: string): [number, number][] {
     points.push([lng / 1e5, lat / 1e5])
   }
   return points
-}
-
-function samplePoints(points: [number, number][], count: number): [number, number][] {
-  if (points.length <= count) return points
-  const step = (points.length - 1) / (count - 1)
-  const out: [number, number][] = []
-  for (let i = 0; i < count; i++) {
-    out.push(points[Math.round(i * step)]!)
-  }
-  return out
-}
-
-async function extractStatesAlongPath(
-  points: [number, number][],
-  token: string
-): Promise<string[]> {
-  const states: string[] = []
-  for (const [lng, lat] of points) {
-    const code = await reverseGeocodeState(lng, lat, token)
-    if (code && states[states.length - 1] !== code) {
-      states.push(code)
-    }
-  }
-  return states
 }
 
 async function reverseGeocodeState(
