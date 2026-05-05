@@ -27,7 +27,7 @@ export default function RegulatoryReminder({ items }: Props) {
 
       {hasNfa && (
         <div className="nfa-reminder__block">
-          <h3>NFA item · Form 5320.20 may be required</h3>
+          <h3>NFA Item · Form 5320.20 may be required</h3>
           <p>
             Interstate transport of certain Title II firearms — short-barreled rifles,
             short-barreled shotguns, machine guns, and destructive devices — by an
@@ -70,7 +70,7 @@ export default function RegulatoryReminder({ items }: Props) {
 
       {hasBrace && (
         <div className="nfa-reminder__block">
-          <h3>Pistol brace · regulatory status unsettled</h3>
+          <h3>Pistol Brace · regulatory status unsettled</h3>
           <p>
             ATF's January 2023 final rule reclassifying brace-equipped pistols as
             short-barreled rifles was <strong>vacated</strong> in <em>Mock v. Garland</em>{' '}
@@ -97,7 +97,7 @@ export default function RegulatoryReminder({ items }: Props) {
 
       {hasFrt && (
         <div className="nfa-reminder__block">
-          <h3>Forced reset trigger (FRT) · contested classification</h3>
+          <h3>Forced Reset Trigger (FRT) · contested classification</h3>
           <p>
             ATF has classified certain forced reset triggers as <strong>machine guns</strong>{' '}
             under the NFA. The classification has been the subject of ongoing
