@@ -21,12 +21,19 @@ interface Props {
 
 export default function VehicleProfilePicker({ current, onApply }: Props) {
   const [vehicles, setVehicles] = useState<VehicleProfile[]>(() => getVehicleProfiles())
-  const [showSaveForm, setShowSaveForm] = useState(false)
+  // First-time users (no saved vehicles yet) see the form expanded by
+  // default. Without this, the MPG/tank fields stay hidden behind a
+  // toggle button and the fuel-aware feature is invisible until the
+  // user happens to click "+ Save current". Once any vehicle is saved
+  // the form collapses to its compact picker shape on the next render.
+  const [showSaveForm, setShowSaveForm] = useState(() => getVehicleProfiles().length === 0)
   const [newName, setNewName] = useState('')
   // Fuel inputs are kept as strings while editing so empty fields don't
   // collapse to 0 and so the inputs are forgiving of partial typing.
   const [newMpg, setNewMpg] = useState('')
   const [newTank, setNewTank] = useState('')
+
+  const noVehicles = vehicles.length === 0
 
   function refresh() {
     setVehicles(getVehicleProfiles())
@@ -78,39 +85,66 @@ export default function VehicleProfilePicker({ current, onApply }: Props) {
 
   return (
     <div className="vehicle-profile">
-      <div className="vehicle-profile__row">
-        <label className="field field--inline">
-          <span>Apply profile</span>
-          <select
-            value=""
-            onChange={(e) => {
-              if (e.target.value) handleApply(e.target.value)
-              e.target.value = ''
-            }}
-            disabled={vehicles.length === 0}
-          >
-            <option value="">
-              {vehicles.length === 0 ? 'No saved vehicles' : 'Select a vehicle…'}
-            </option>
-            {vehicles.map((v) => (
-              <option key={v.id} value={v.id}>
-                {v.name}
-              </option>
-            ))}
-          </select>
-        </label>
+      {/* Apply-profile dropdown only renders when there's something to
+          apply. With zero saved vehicles the previous "No saved vehicles"
+          select read like a broken control with no entry point — instead
+          we drop it entirely and surface the save form (or its CTA) below. */}
+      {!noVehicles && (
+        <div className="vehicle-profile__row">
+          <label className="field field--inline">
+            <span>Apply profile</span>
+            <select
+              value=""
+              onChange={(e) => {
+                if (e.target.value) handleApply(e.target.value)
+                e.target.value = ''
+              }}
+            >
+              <option value="">Select a vehicle…</option>
+              {vehicles.map((v) => (
+                <option key={v.id} value={v.id}>
+                  {v.name}
+                </option>
+              ))}
+            </select>
+          </label>
 
+          <button
+            type="button"
+            className="btn btn--ghost btn--small"
+            onClick={() => setShowSaveForm((s) => !s)}
+          >
+            {showSaveForm ? 'Cancel' : '+ Save current'}
+          </button>
+        </div>
+      )}
+
+      {/* Empty-state CTA — only shown once the user has explicitly
+          dismissed the expanded form via "Cancel". Provides a clear way
+          back into adding a vehicle without re-introducing the dead
+          "No saved vehicles" select as the only affordance. */}
+      {noVehicles && !showSaveForm && (
         <button
           type="button"
           className="btn btn--ghost btn--small"
-          onClick={() => setShowSaveForm((s) => !s)}
+          onClick={() => setShowSaveForm(true)}
         >
-          {showSaveForm ? 'Cancel' : '+ Save current'}
+          + Add vehicle
         </button>
-      </div>
+      )}
 
       {showSaveForm && (
         <div className="vehicle-profile__save">
+          {/* Onboarding line — first-time users only. Frames what saving
+              does so the form doesn't read as "fill these mystery fields,"
+              and specifically calls out fuel-aware routing as the reward
+              for filling MPG and tank size. */}
+          {noVehicles && (
+            <p className="muted small vehicle-profile__intro">
+              Save your vehicle to reuse these transport conditions later.
+              Add MPG and tank size to enable fuel-aware route suggestions.
+            </p>
+          )}
           <input
             type="text"
             className="vehicle-profile__name-input"
@@ -154,14 +188,28 @@ export default function VehicleProfilePicker({ current, onApply }: Props) {
             Provide both MPG and tank size to enable fuel-aware route suggestions.
             Leave blank to skip this feature.
           </p>
-          <button
-            type="button"
-            className="btn btn--primary btn--small"
-            onClick={handleSave}
-            disabled={!newName.trim()}
-          >
-            Save
-          </button>
+          <div className="vehicle-profile__save-actions">
+            <button
+              type="button"
+              className="btn btn--primary btn--small"
+              onClick={handleSave}
+              disabled={!newName.trim()}
+            >
+              Save
+            </button>
+            {/* In the no-vehicles state the toggle row is hidden, so we
+                provide the dismiss action here. With saved vehicles the
+                toggle button outside the form already plays this role. */}
+            {noVehicles && (
+              <button
+                type="button"
+                className="btn btn--ghost btn--small"
+                onClick={() => setShowSaveForm(false)}
+              >
+                Cancel
+              </button>
+            )}
+          </div>
         </div>
       )}
 

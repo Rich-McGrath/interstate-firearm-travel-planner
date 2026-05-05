@@ -2370,6 +2370,15 @@ p { margin: 0 0 0.8em; color: var(--cream-1); }
   color: var(--ink-1);
 }
 
+.vehicle-profile__intro {
+  margin: 0 0 0.85rem;
+}
+
+.vehicle-profile__save-actions {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
 
 
 /* =====================================================================
