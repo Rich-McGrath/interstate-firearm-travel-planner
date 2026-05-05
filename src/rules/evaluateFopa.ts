@@ -88,11 +88,11 @@ export function evaluateFopa(trip: TripInput): FopaAnalysis {
         } is not in the seed dataset — manual review required.`
       )
       if (qualifiesPotentially === true) qualifiesPotentially = 'manual_review'
-    } else {
-      reasons.push(
-        `Endpoints (${originState} → ${destinationState}) appear in the seed dataset; user must independently confirm lawful possession at both.`
-      )
     }
+    // No happy-path reason emitted: the lawful-possession requirement is
+    // already in the always-visible Required conditions list, so adding
+    // a "you must confirm it yourself" bullet to Reasons is redundant
+    // and reads like a finding rather than the meta-comment it is.
   }
 
   // NFA / suppressor / brace / FRT — items with unsettled or contested
