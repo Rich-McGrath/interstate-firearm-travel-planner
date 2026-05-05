@@ -1,4 +1,4 @@
-import type { RestrictionResult, RiskLevel, TripInput } from '../types/domain'
+import type { RestrictionResult, TripInput } from '../types/domain'
 import { getStateProfile, getStateName } from '../data/states'
 
 // Pure function. For each state on the route, surfaces likely conflicts
@@ -81,16 +81,6 @@ export function evaluateRestrictions(input: RestrictionsInput): RestrictionResul
         level: 'high',
         title: 'NFA-item risk',
         detail: `${stateName}: ${profile.nfaRiskNote}`,
-      })
-    }
-
-    // Per-state notes (informational)
-    for (const note of profile.notes) {
-      results.push({
-        stateCode,
-        level: 'caution' as RiskLevel,
-        title: 'State note',
-        detail: `${stateName}: ${note}`,
       })
     }
   }

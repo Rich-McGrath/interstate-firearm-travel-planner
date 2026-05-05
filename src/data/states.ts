@@ -1,142 +1,287 @@
-import type { StateLawProfile } from '../types/domain'
+import type { RecognitionStatus, StateLawProfile } from '../types/domain'
 
-// SEED DATA ONLY. This is illustrative and partial. Before any real-world
-// use, replace with a vetted, regularly-updated dataset sourced from
-// official state attorney-general publications and current statutes.
-// Recognition entries default to 'manual_review' for any pair not listed.
+// SEED DATA. Illustrative only. Every entry is a coarse 3-tier
+// classification of the state's carry-recognition posture, not a
+// definitive answer. Real reciprocity is granular (some states recognize
+// only resident permits, only enhanced permits, only specific issuing
+// states, etc.). Replace with a vetted, current dataset before any
+// real-world use.
 
-const verified = '2025-01-01'
+type CarryPolicy =
+  | 'broad' // permissive — generally recognizes most other state permits
+  | 'limited' // shall-issue with conditions or partial recognition
+  | 'restrictive' // recognizes few or no out-of-state permits
 
-export const STATE_PROFILES: Record<string, StateLawProfile> = {
-  MA: {
-    stateCode: 'MA',
-    stateName: 'Massachusetts',
-    permitRecognition: {
-      MA: 'yes',
-      NY: 'no',
-      NJ: 'no',
-      CT: 'no',
-      PA: 'no',
-    },
+interface StateDef {
+  name: string
+  policy: CarryPolicy
+  magazineLimit?: number
+  hasAssaultWeaponBan?: boolean
+  hasSpecialTransportRules?: boolean
+  suppressorRiskNote?: string
+  nfaRiskNote?: string
+  notes: string[]
+}
+
+const SEED_VERIFIED = '2025-01-01'
+
+// All 50 states + DC. Policy assignments are conservative approximations.
+const STATE_DEFS: Record<string, StateDef> = {
+  AL: { name: 'Alabama', policy: 'broad', notes: [] },
+  AK: { name: 'Alaska', policy: 'broad', notes: ['Constitutional carry; permit not required for residents.'] },
+  AZ: { name: 'Arizona', policy: 'broad', notes: ['Constitutional carry; permits issued for reciprocity purposes.'] },
+  AR: { name: 'Arkansas', policy: 'broad', notes: [] },
+  CA: {
+    name: 'California',
+    policy: 'restrictive',
     magazineLimit: 10,
     hasAssaultWeaponBan: true,
     hasSpecialTransportRules: true,
-    suppressorRiskNote:
-      'Possession of suppressors by civilians is generally prohibited; manual review required.',
-    nfaRiskNote:
-      'NFA items face state-level restrictions in addition to federal rules; manual review required.',
+    suppressorRiskNote: 'Civilian suppressor possession is generally prohibited.',
     notes: [
-      'Magazine capacity above the state limit may not be lawful to possess.',
-      'AR-style platforms may face significant restrictions; manual review required.',
-      'Transport rules may require additional containment beyond federal baseline.',
+      'California generally does not recognize out-of-state concealed carry permits.',
+      'Magazine and assault-weapon definitions apply.',
     ],
-    sourceType: 'secondary',
-    sourceUrl: 'https://www.mass.gov/topics/firearms-laws-licensing',
-    lastVerified: verified,
-    confidence: 'medium',
   },
-
-  NY: {
-    stateCode: 'NY',
-    stateName: 'New York',
-    permitRecognition: {
-      NY: 'yes',
-      MA: 'no',
-      NJ: 'no',
-      CT: 'no',
-      PA: 'no',
-    },
-    magazineLimit: 10,
-    hasAssaultWeaponBan: true,
+  CO: {
+    name: 'Colorado',
+    policy: 'limited',
+    magazineLimit: 15,
     hasSpecialTransportRules: true,
-    suppressorRiskNote:
-      'Suppressors generally prohibited for civilian possession in NY; manual review required.',
-    nfaRiskNote:
-      'NFA items subject to additional state restrictions; manual review required.',
     notes: [
-      'New York generally does not recognize out-of-state concealed carry permits.',
       'Magazine capacity above the state limit raises a likely conflict.',
-      'AR-style features may trigger an assault-weapon classification.',
+      'Reciprocity is limited to specific issuing states; verify before travel.',
     ],
-    sourceType: 'secondary',
-    sourceUrl: 'https://troopers.ny.gov/firearms',
-    lastVerified: verified,
-    confidence: 'medium',
   },
-
-  NJ: {
-    stateCode: 'NJ',
-    stateName: 'New Jersey',
-    permitRecognition: {
-      NJ: 'yes',
-      MA: 'no',
-      NY: 'no',
-      CT: 'no',
-      PA: 'no',
-    },
-    magazineLimit: 10,
-    hasAssaultWeaponBan: true,
-    hasSpecialTransportRules: true,
-    suppressorRiskNote:
-      'Suppressors generally prohibited; manual review required.',
-    nfaRiskNote:
-      'Many NFA items face additional state restrictions; manual review required.',
-    notes: [
-      'New Jersey generally does not recognize out-of-state concealed carry permits.',
-      'Hollow-point ammunition has additional restrictions; manual review required.',
-      'Strict transport conditions apply; review FOPA conditions carefully.',
-    ],
-    sourceType: 'secondary',
-    sourceUrl: 'https://www.njsp.org/firearms/',
-    lastVerified: verified,
-    confidence: 'medium',
-  },
-
   CT: {
-    stateCode: 'CT',
-    stateName: 'Connecticut',
-    permitRecognition: {
-      CT: 'yes',
-      MA: 'no',
-      NY: 'no',
-      NJ: 'no',
-      PA: 'no',
-    },
+    name: 'Connecticut',
+    policy: 'restrictive',
     magazineLimit: 10,
     hasAssaultWeaponBan: true,
     hasSpecialTransportRules: true,
     notes: [
       'Connecticut generally does not recognize out-of-state permits.',
-      'Magazine and assault-weapon definitions may apply.',
+      'Magazine and assault-weapon definitions apply.',
     ],
-    sourceType: 'secondary',
-    sourceUrl: 'https://portal.ct.gov/despp',
-    lastVerified: verified,
-    confidence: 'medium',
   },
-
-  PA: {
-    stateCode: 'PA',
-    stateName: 'Pennsylvania',
-    permitRecognition: {
-      PA: 'yes',
-      MA: 'limited',
-      NY: 'no',
-      NJ: 'no',
-      CT: 'limited',
-    },
-    hasAssaultWeaponBan: false,
-    hasSpecialTransportRules: false,
+  DE: {
+    name: 'Delaware',
+    policy: 'restrictive',
+    hasSpecialTransportRules: true,
+    notes: ['Delaware recognizes a limited list of out-of-state permits; verify before travel.'],
+  },
+  DC: {
+    name: 'District of Columbia',
+    policy: 'restrictive',
+    magazineLimit: 10,
+    hasAssaultWeaponBan: true,
+    hasSpecialTransportRules: true,
+    suppressorRiskNote: 'Civilian suppressor possession is generally prohibited.',
+    nfaRiskNote: 'Many NFA items face additional restrictions.',
     notes: [
-      'Pennsylvania has reciprocity arrangements with several states; verify current list before travel.',
-      'Recognition status of any specific out-of-state permit should be manually verified.',
+      'D.C. does not recognize out-of-state concealed carry permits.',
+      'D.C. has its own carry licensing process that is not transferable.',
     ],
-    sourceType: 'secondary',
-    sourceUrl: 'https://www.attorneygeneral.gov/firearms-reciprocity/',
-    lastVerified: verified,
-    confidence: 'medium',
   },
+  FL: { name: 'Florida', policy: 'broad', notes: [] },
+  GA: { name: 'Georgia', policy: 'broad', notes: ['Constitutional carry.'] },
+  HI: {
+    name: 'Hawaii',
+    policy: 'restrictive',
+    magazineLimit: 10,
+    hasAssaultWeaponBan: true,
+    hasSpecialTransportRules: true,
+    notes: ['Hawaii generally does not recognize out-of-state permits.'],
+  },
+  ID: { name: 'Idaho', policy: 'broad', notes: ['Constitutional carry for residents.'] },
+  IL: {
+    name: 'Illinois',
+    policy: 'restrictive',
+    magazineLimit: 10,
+    hasAssaultWeaponBan: true,
+    hasSpecialTransportRules: true,
+    notes: [
+      'Illinois generally does not recognize out-of-state permits for non-residents.',
+      'Firearm Owner Identification (FOID) requirements may apply to possession.',
+    ],
+  },
+  IN: { name: 'Indiana', policy: 'broad', notes: ['Constitutional carry.'] },
+  IA: { name: 'Iowa', policy: 'broad', notes: [] },
+  KS: { name: 'Kansas', policy: 'broad', notes: ['Constitutional carry.'] },
+  KY: { name: 'Kentucky', policy: 'broad', notes: ['Constitutional carry.'] },
+  LA: { name: 'Louisiana', policy: 'broad', notes: [] },
+  ME: { name: 'Maine', policy: 'broad', notes: ['Constitutional carry.'] },
+  MD: {
+    name: 'Maryland',
+    policy: 'restrictive',
+    magazineLimit: 10,
+    hasAssaultWeaponBan: true,
+    hasSpecialTransportRules: true,
+    notes: [
+      'Maryland generally does not recognize out-of-state permits.',
+      'Magazine and regulated-firearm definitions apply.',
+    ],
+  },
+  MA: {
+    name: 'Massachusetts',
+    policy: 'restrictive',
+    magazineLimit: 10,
+    hasAssaultWeaponBan: true,
+    hasSpecialTransportRules: true,
+    suppressorRiskNote: 'Civilian suppressor possession is generally prohibited.',
+    nfaRiskNote: 'NFA items face state-level restrictions in addition to federal rules.',
+    notes: [
+      'Massachusetts does not recognize out-of-state concealed carry permits for non-residents.',
+      'Magazine and assault-weapon definitions apply.',
+    ],
+  },
+  MI: { name: 'Michigan', policy: 'limited', notes: ['Recognition is limited to specific issuing states.'] },
+  MN: {
+    name: 'Minnesota',
+    policy: 'limited',
+    notes: ['Recognizes a specific list of out-of-state permits; verify issuing state.'],
+  },
+  MS: { name: 'Mississippi', policy: 'broad', notes: ['Constitutional carry.'] },
+  MO: { name: 'Missouri', policy: 'broad', notes: ['Constitutional carry.'] },
+  MT: { name: 'Montana', policy: 'broad', notes: ['Constitutional carry.'] },
+  NE: { name: 'Nebraska', policy: 'broad', notes: ['Constitutional carry.'] },
+  NV: { name: 'Nevada', policy: 'limited', notes: ['Recognition is limited to specific issuing states.'] },
+  NH: { name: 'New Hampshire', policy: 'broad', notes: ['Constitutional carry.'] },
+  NJ: {
+    name: 'New Jersey',
+    policy: 'restrictive',
+    magazineLimit: 10,
+    hasAssaultWeaponBan: true,
+    hasSpecialTransportRules: true,
+    suppressorRiskNote: 'Civilian suppressor possession is generally prohibited.',
+    nfaRiskNote: 'Many NFA items face additional state restrictions.',
+    notes: [
+      'New Jersey generally does not recognize out-of-state concealed carry permits.',
+      'Hollow-point ammunition has additional restrictions.',
+      'Strict transport conditions apply.',
+    ],
+  },
+  NM: { name: 'New Mexico', policy: 'limited', notes: ['Recognizes resident permits from specific issuing states.'] },
+  NY: {
+    name: 'New York',
+    policy: 'restrictive',
+    magazineLimit: 10,
+    hasAssaultWeaponBan: true,
+    hasSpecialTransportRules: true,
+    suppressorRiskNote: 'Civilian suppressor possession is generally prohibited.',
+    nfaRiskNote: 'NFA items subject to additional state restrictions.',
+    notes: [
+      'New York generally does not recognize out-of-state concealed carry permits.',
+      'Magazine and assault-weapon definitions apply; SAFE Act restrictions in effect.',
+    ],
+  },
+  NC: { name: 'North Carolina', policy: 'broad', notes: [] },
+  ND: { name: 'North Dakota', policy: 'broad', notes: ['Constitutional carry for residents.'] },
+  OH: { name: 'Ohio', policy: 'broad', notes: ['Constitutional carry.'] },
+  OK: { name: 'Oklahoma', policy: 'broad', notes: ['Constitutional carry.'] },
+  OR: {
+    name: 'Oregon',
+    policy: 'restrictive',
+    hasSpecialTransportRules: true,
+    notes: ['Oregon generally does not recognize out-of-state permits.'],
+  },
+  PA: {
+    name: 'Pennsylvania',
+    policy: 'broad',
+    notes: [
+      'Pennsylvania has reciprocity arrangements with many states; verify the current list before travel.',
+    ],
+  },
+  RI: {
+    name: 'Rhode Island',
+    policy: 'restrictive',
+    magazineLimit: 10,
+    hasSpecialTransportRules: true,
+    notes: ['Rhode Island generally does not recognize out-of-state permits.'],
+  },
+  SC: { name: 'South Carolina', policy: 'broad', notes: [] },
+  SD: { name: 'South Dakota', policy: 'broad', notes: ['Constitutional carry.'] },
+  TN: { name: 'Tennessee', policy: 'broad', notes: ['Constitutional carry.'] },
+  TX: { name: 'Texas', policy: 'broad', notes: ['Constitutional carry; License to Carry available for reciprocity.'] },
+  UT: { name: 'Utah', policy: 'broad', notes: ['Constitutional carry.'] },
+  VT: {
+    name: 'Vermont',
+    policy: 'broad',
+    notes: [
+      'Vermont has constitutional carry and does not issue carry permits, which can complicate reciprocity in the other direction.',
+    ],
+  },
+  VA: { name: 'Virginia', policy: 'broad', notes: [] },
+  WA: {
+    name: 'Washington',
+    policy: 'restrictive',
+    magazineLimit: 10,
+    hasSpecialTransportRules: true,
+    notes: [
+      'Washington generally does not recognize out-of-state permits.',
+      'Magazine and assault-weapon definitions apply.',
+    ],
+  },
+  WV: { name: 'West Virginia', policy: 'broad', notes: ['Constitutional carry.'] },
+  WI: { name: 'Wisconsin', policy: 'limited', notes: ['Recognizes a specific list of out-of-state permits.'] },
+  WY: { name: 'Wyoming', policy: 'broad', notes: ['Constitutional carry for residents.'] },
 }
+
+function recognitionFor(
+  carryingState: CarryPolicy,
+  issuingState: CarryPolicy
+): RecognitionStatus {
+  // Restrictive states generally recognize no out-of-state permits, with
+  // narrow exceptions we treat as 'limited'.
+  if (carryingState === 'restrictive') {
+    if (issuingState === 'broad') return 'limited'
+    return 'no'
+  }
+  if (carryingState === 'limited') {
+    if (issuingState === 'broad') return 'limited'
+    return 'no'
+  }
+  // Broad-policy states tend to recognize most permits, but recognition of
+  // permits issued by restrictive states often comes with conditions.
+  if (issuingState === 'restrictive') return 'limited'
+  return 'yes'
+}
+
+function buildPermitRecognition(carrying: StateDef): Record<string, RecognitionStatus> {
+  const map: Record<string, RecognitionStatus> = {}
+  for (const [code, def] of Object.entries(STATE_DEFS)) {
+    map[code] = code === Object.keys(STATE_DEFS).find((k) => STATE_DEFS[k] === carrying)
+      ? 'yes' // a state always recognizes its own permits
+      : recognitionFor(carrying.policy, def.policy)
+  }
+  return map
+}
+
+function toProfile(code: string, def: StateDef): StateLawProfile {
+  return {
+    stateCode: code,
+    stateName: def.name,
+    permitRecognition: buildPermitRecognition(def),
+    ...(def.magazineLimit !== undefined ? { magazineLimit: def.magazineLimit } : {}),
+    ...(def.hasAssaultWeaponBan !== undefined
+      ? { hasAssaultWeaponBan: def.hasAssaultWeaponBan }
+      : {}),
+    ...(def.hasSpecialTransportRules !== undefined
+      ? { hasSpecialTransportRules: def.hasSpecialTransportRules }
+      : {}),
+    ...(def.suppressorRiskNote ? { suppressorRiskNote: def.suppressorRiskNote } : {}),
+    ...(def.nfaRiskNote ? { nfaRiskNote: def.nfaRiskNote } : {}),
+    notes: def.notes,
+    sourceType: 'secondary',
+    sourceUrl: 'https://www.usconcealedcarry.com/resources/ccw_reciprocity_map/',
+    lastVerified: SEED_VERIFIED,
+    confidence: 'medium',
+  }
+}
+
+export const STATE_PROFILES: Record<string, StateLawProfile> = Object.fromEntries(
+  Object.entries(STATE_DEFS).map(([code, def]) => [code, toProfile(code, def)])
+)
 
 export function getStateProfile(stateCode: string): StateLawProfile | undefined {
   return STATE_PROFILES[stateCode.toUpperCase()]
@@ -145,3 +290,8 @@ export function getStateProfile(stateCode: string): StateLawProfile | undefined 
 export function getStateName(stateCode: string): string {
   return STATE_PROFILES[stateCode.toUpperCase()]?.stateName ?? stateCode
 }
+
+// Compact list for the permit-state autocomplete.
+export const ALL_STATES: { code: string; name: string }[] = Object.entries(STATE_DEFS)
+  .map(([code, def]) => ({ code, name: def.name }))
+  .sort((a, b) => a.name.localeCompare(b.name))

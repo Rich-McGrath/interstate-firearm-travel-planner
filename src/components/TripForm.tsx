@@ -6,6 +6,7 @@ import type {
   TripInput,
 } from '../types/domain'
 import AddressAutocomplete from './AddressAutocomplete'
+import StateAutocomplete from './StateAutocomplete'
 import type { GeocodeSuggestion } from '../services/mapboxClient'
 
 interface Props {
@@ -158,16 +159,11 @@ export default function TripForm({ onSubmit, initial }: Props) {
         </label>
 
         {hasPermit && (
-          <label className="field">
-            <span>Permit issuing state</span>
-            <input
-              type="text"
-              value={permitState}
-              onChange={(e) => setPermitState(e.target.value.toUpperCase())}
-              maxLength={2}
-              placeholder="MA"
-            />
-          </label>
+          <StateAutocomplete
+            label="Permit issuing state"
+            value={permitState}
+            onChange={setPermitState}
+          />
         )}
 
         <label className="field">
