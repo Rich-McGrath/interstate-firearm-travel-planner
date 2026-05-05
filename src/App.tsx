@@ -13,6 +13,7 @@ import { evaluateReciprocity } from './rules/evaluateReciprocity'
 import { evaluateRestrictions } from './rules/evaluateRestrictions'
 import { scoreRouteRisk } from './rules/scoreRouteRisk'
 import { enrichStopsWithStateContext } from './rules/enrichStops'
+import { planFuelStops } from './rules/planFuelStops'
 import { scoreStops } from './rules/scoreStops'
 import { generateChecklist } from './utils/checklist'
 import {
@@ -232,6 +233,63 @@ export default function App() {
     [enrichedStops, stopFilters]
   )
 
+  // Plan fuel-aware stops based on the active trip's vehicle profile.
+  // Returns two buckets: autoAdd (strict-state pre-border top-offs)
+  // and suggest (routine low-fuel suggestions). The auto-add ones go
+  // straight into selectedStopIds via the effect below. The suggest
+  // ones surface visually in the map and sidebar but require user
+  // acceptance.
+  const fuelPlan = useMemo(() => {
+    if (!trip || !evaluation?.route) return { autoAdd: [], suggest: [] }
+    return planFuelStops({
+      route: evaluation.route,
+      mpg: trip.mpg ?? 0,
+      tankSizeGallons: trip.tankSizeGallons ?? 0,
+      availableStations: enrichedStops,
+    })
+  }, [trip, evaluation?.route, enrichedStops])
+
+  // Build a Set of fuel-suggestion stop IDs for fast lookup in render
+  // paths that need to badge stops as "suggested for fuel."
+  const fuelSuggestionMeta = useMemo(() => {
+    const map = new Map<string, { kind: 'low_fuel' | 'strict_state_topoff'; reason: string }>()
+    for (const s of fuelPlan.autoAdd) map.set(s.stopId, { kind: s.kind, reason: s.reason })
+    for (const s of fuelPlan.suggest) map.set(s.stopId, { kind: s.kind, reason: s.reason })
+    return map
+  }, [fuelPlan])
+
+  // Track which auto-add fuel stops we've already merged into the
+  // user's selection so re-renders (e.g., the user toggling something
+  // off) don't immediately re-add them. This is the "auto-add once,
+  // then respect the user" contract.
+  const autoAddedRef = useRef<Set<string>>(new Set())
+
+  // When the trip or fuel plan changes (new submit, new route), reset
+  // the auto-added tracker and merge the latest auto-add list into the
+  // selection. Subsequent re-renders won't re-add anything because the
+  // set already contains those IDs.
+  useEffect(() => {
+    if (!trip) return
+    autoAddedRef.current = new Set()
+  }, [trip, evaluation?.route?.id])
+
+  useEffect(() => {
+    if (fuelPlan.autoAdd.length === 0) return
+    const newlyAdding: string[] = []
+    for (const s of fuelPlan.autoAdd) {
+      if (!autoAddedRef.current.has(s.stopId)) {
+        newlyAdding.push(s.stopId)
+        autoAddedRef.current.add(s.stopId)
+      }
+    }
+    if (newlyAdding.length === 0) return
+    setSelectedStopIds((prev) => {
+      const next = [...prev]
+      for (const id of newlyAdding) if (!next.includes(id)) next.push(id)
+      return next
+    })
+  }, [fuelPlan])
+
   function toggleStop(id: string) {
     setSelectedStopIds((prev) =>
       prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]
@@ -313,6 +371,7 @@ export default function App() {
                 hoveredStopId={hoveredStopId}
                 onToggleSelect={toggleStop}
                 onHoverStop={setHoveredStopId}
+                fuelSuggestionMeta={fuelSuggestionMeta}
               />
 
               {/* Duty to inform by state */}

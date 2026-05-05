@@ -66,6 +66,11 @@ export interface TripInput {
   firearmAccessibleFromPassengerCompartment: boolean
   vehicleHasSeparateTrunk: boolean
   lockedContainerUsed: boolean
+  // Optional fuel data for fuel-aware routing. Populated from the
+  // applied vehicle profile when the user picks one. Both must be set
+  // for fuel-aware features to activate.
+  mpg?: number
+  tankSizeGallons?: number
 }
 
 // Convenience accessors so the rules engine doesn't have to reach into
@@ -117,6 +122,30 @@ export interface AmmunitionRestriction {
   detail: string
   // Severity for color-coding the surfaced warning.
   level: RiskLevel
+}
+
+// A fuel-aware refueling suggestion, computed by planFuelStops from
+// the route + vehicle profile + available POIs. Two flavors:
+//   - 'strict_state_topoff': fill up before crossing into a strict
+//     state. Auto-added to the trip. Higher priority because missing
+//     one has real consequences (e.g. running low in NJ).
+//   - 'low_fuel': routine "you're getting low" suggestion. Presented
+//     visually but not auto-added — the user accepts via the sidebar.
+export type FuelSuggestionKind = 'strict_state_topoff' | 'low_fuel'
+
+export interface FuelSuggestion {
+  // The underlying station this suggestion points at. Reuses the same
+  // shape as StopRecommendation so it can flow through the existing
+  // map + sidebar pipeline without translation.
+  stopId: string
+  kind: FuelSuggestionKind
+  // Human-readable reason ("Top off before entering New Jersey",
+  // "Low fuel — ~45 mi remaining"). Surfaced on the stop card and pin
+  // popup so the user knows why this stop was suggested.
+  reason: string
+  // Where along the route (in miles from origin) this suggestion is
+  // placed. Used for sorting and for the user-facing "X mi in" display.
+  milesFromOrigin: number
 }
 
 export interface StateLawProfile {

@@ -2052,6 +2052,51 @@ p { margin: 0 0 0.8em; color: var(--cream-1); }
   gap: 0.3rem;
 }
 
+/* Fuel-suggested cards: a left-edge accent and a banner near the top
+   making the suggestion's reason explicit. Two flavors with different
+   accent colors so the user can distinguish auto-added strict-state
+   top-offs from softer low-fuel suggestions at a glance. */
+.stop-card--fuel-strict {
+  border-left: 3px solid #d44545;
+}
+
+.stop-card--fuel-low {
+  border-left: 3px solid #5cb8d4;
+}
+
+.stop-card__fuel-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.45rem;
+  padding: 0.35rem 0.55rem;
+  border-radius: 3px;
+  font-size: 0.78rem;
+  line-height: 1.3;
+}
+
+.stop-card__fuel-banner--strict_state_topoff {
+  background: rgba(212, 69, 69, 0.12);
+  border: 1px solid rgba(212, 69, 69, 0.35);
+  color: #f4a8a8;
+}
+
+.stop-card__fuel-banner--strict_state_topoff .mono {
+  color: #d44545;
+  font-weight: 600;
+}
+
+.stop-card__fuel-banner--low_fuel {
+  background: rgba(92, 184, 212, 0.10);
+  border: 1px solid rgba(92, 184, 212, 0.32);
+  color: #b6dde8;
+}
+
+.stop-card__fuel-banner--low_fuel .mono {
+  color: #5cb8d4;
+  font-weight: 600;
+}
+
 /* Small badge variant for the compact card */
 .badge--small {
   font-size: 0.66rem;

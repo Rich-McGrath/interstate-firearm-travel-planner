@@ -58,6 +58,13 @@ export default function TripForm({ onSubmit, initial }: Props) {
   )
   const [vehicleHasTrunk, setVehicleHasTrunk] = useState(initial?.vehicleHasSeparateTrunk ?? true)
   const [lockedContainer, setLockedContainer] = useState(initial?.lockedContainerUsed ?? true)
+  // Fuel fields are carried on the trip when applied from a vehicle
+  // profile. Stored as numbers (or undefined) — TripInput's optional
+  // shape lets us pass through "user didn't provide fuel data."
+  const [mpg, setMpg] = useState<number | undefined>(initial?.mpg)
+  const [tankSizeGallons, setTankSizeGallons] = useState<number | undefined>(
+    initial?.tankSizeGallons
+  )
 
   const [errors, setErrors] = useState<string[]>([])
 
@@ -85,6 +92,8 @@ export default function TripForm({ onSubmit, initial }: Props) {
       setVehicleHasTrunk(initial.vehicleHasSeparateTrunk)
     }
     if (initial.lockedContainerUsed !== undefined) setLockedContainer(initial.lockedContainerUsed)
+    setMpg(initial.mpg)
+    setTankSizeGallons(initial.tankSizeGallons)
   }, [initial])
 
   function applyVehicleProfile(p: VehicleProfile) {
@@ -92,6 +101,10 @@ export default function TripForm({ onSubmit, initial }: Props) {
     setLockedContainer(p.lockedContainerUsed)
     setFirearmAccessible(p.firearmAccessibleFromPassengerCompartment)
     setAmmoAccessible(p.ammoAccessibleFromPassengerCompartment)
+    // Apply fuel fields too — they're optional, so undefined here means
+    // "this profile has no fuel data; clear any previous fuel data."
+    setMpg(p.mpg)
+    setTankSizeGallons(p.tankSizeGallons)
   }
 
   function toggleItem(item: TransportItem) {
@@ -136,6 +149,8 @@ export default function TripForm({ onSubmit, initial }: Props) {
       firearmAccessibleFromPassengerCompartment: firearmAccessible,
       vehicleHasSeparateTrunk: vehicleHasTrunk,
       lockedContainerUsed: lockedContainer,
+      ...(mpg !== undefined ? { mpg } : {}),
+      ...(tankSizeGallons !== undefined ? { tankSizeGallons } : {}),
     })
   }
 

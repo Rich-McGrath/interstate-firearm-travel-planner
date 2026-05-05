@@ -38,6 +38,13 @@ interface Props {
   hoveredStopId: string | null
   onToggleSelect: (id: string) => void
   onHoverStop: (id: string | null) => void
+  // Fuel-aware suggestion metadata. Maps stop IDs to their suggestion
+  // kind + reason so cards and pins can render distinctly. Optional —
+  // empty Map when fuel-aware planning isn't active.
+  fuelSuggestionMeta?: Map<
+    string,
+    { kind: 'low_fuel' | 'strict_state_topoff'; reason: string }
+  >
 }
 
 export default function StopsSection({
@@ -54,6 +61,7 @@ export default function StopsSection({
   hoveredStopId,
   onToggleSelect,
   onHoverStop,
+  fuelSuggestionMeta,
 }: Props) {
   // Partition into selected (pinned to top of sidebar) and unselected
   // (the "Suggestions" body). Selected list preserves the order in
@@ -201,6 +209,7 @@ export default function StopsSection({
                         hovered={stop.id === hoveredStopId}
                         onToggle={onToggleSelect}
                         onHover={onHoverStop}
+                        fuelMeta={fuelSuggestionMeta?.get(stop.id)}
                       />
                     ))}
                   </ul>
@@ -230,6 +239,7 @@ export default function StopsSection({
                         hovered={stop.id === hoveredStopId}
                         onToggle={onToggleSelect}
                         onHover={onHoverStop}
+                        fuelMeta={fuelSuggestionMeta?.get(stop.id)}
                       />
                     ))}
                   </ul>
@@ -257,6 +267,7 @@ interface CompactCardProps {
   hovered: boolean
   onToggle: (id: string) => void
   onHover: (id: string | null) => void
+  fuelMeta?: { kind: 'low_fuel' | 'strict_state_topoff'; reason: string }
 }
 
 function CompactStopCard({
@@ -265,13 +276,24 @@ function CompactStopCard({
   hovered,
   onToggle,
   onHover,
+  fuelMeta,
 }: CompactCardProps) {
+  // A fuel-suggested card gets visually flagged on the left edge with
+  // a colored accent. Strict-state top-offs use the strict (red) hue
+  // so the user knows this is the "you really want this stop" tier;
+  // routine low-fuel suggestions use a softer cyan/blue so they read
+  // as helpful suggestions rather than urgent warnings.
+  const fuelClass = fuelMeta
+    ? fuelMeta.kind === 'strict_state_topoff'
+      ? 'stop-card--fuel-strict'
+      : 'stop-card--fuel-low'
+    : ''
   return (
     <li
       data-stop-id={stop.id}
       className={`stop-card stop-card--compact ${selected ? 'is-selected' : ''} ${
         hovered ? 'is-hovered' : ''
-      }`}
+      } ${fuelClass}`}
       onMouseEnter={() => onHover(stop.id)}
       onMouseLeave={() => onHover(null)}
     >
@@ -281,6 +303,15 @@ function CompactStopCard({
           {formatStopLabel(stop.label)}
         </span>
       </header>
+
+      {fuelMeta && (
+        <div className={`stop-card__fuel-banner stop-card__fuel-banner--${fuelMeta.kind}`}>
+          <span className="mono small">
+            {fuelMeta.kind === 'strict_state_topoff' ? '⛽ Auto-added' : '⛽ Suggested'}
+          </span>
+          <span>{fuelMeta.reason}</span>
+        </div>
+      )}
 
       <div className="stop-card__meta stop-card__meta--compact">
         <span className="mono">

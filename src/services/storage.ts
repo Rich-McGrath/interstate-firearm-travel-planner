@@ -120,6 +120,11 @@ export interface VehicleProfile {
   lockedContainerUsed: boolean
   firearmAccessibleFromPassengerCompartment: boolean
   ammoAccessibleFromPassengerCompartment: boolean
+  // Fuel-aware routing fields. Both must be present for fuel logic to
+  // activate; either undefined or zero falls back to non-fuel-aware
+  // routing. Reasonable ranges: mpg 5-100, tankSize 5-50 gallons.
+  mpg?: number
+  tankSizeGallons?: number
 }
 
 export function getVehicleProfiles(): VehicleProfile[] {

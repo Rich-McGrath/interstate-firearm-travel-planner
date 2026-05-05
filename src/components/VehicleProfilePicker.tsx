@@ -7,6 +7,9 @@ import {
 } from '../services/storage'
 
 interface Props {
+  // Current transport-condition state from the form. Used as the
+  // baseline when the user clicks "Save current" — saved profile
+  // captures both transport conditions and the new fuel fields.
   current: {
     vehicleHasSeparateTrunk: boolean
     lockedContainerUsed: boolean
@@ -20,6 +23,10 @@ export default function VehicleProfilePicker({ current, onApply }: Props) {
   const [vehicles, setVehicles] = useState<VehicleProfile[]>(() => getVehicleProfiles())
   const [showSaveForm, setShowSaveForm] = useState(false)
   const [newName, setNewName] = useState('')
+  // Fuel inputs are kept as strings while editing so empty fields don't
+  // collapse to 0 and so the inputs are forgiving of partial typing.
+  const [newMpg, setNewMpg] = useState('')
+  const [newTank, setNewTank] = useState('')
 
   function refresh() {
     setVehicles(getVehicleProfiles())
@@ -30,6 +37,12 @@ export default function VehicleProfilePicker({ current, onApply }: Props) {
     if (profile) onApply(profile)
   }
 
+  function parseOptionalNumber(s: string): number | undefined {
+    const n = parseFloat(s)
+    if (!Number.isFinite(n) || n <= 0) return undefined
+    return n
+  }
+
   function handleSave() {
     const name = newName.trim()
     if (!name) return
@@ -38,15 +51,29 @@ export default function VehicleProfilePicker({ current, onApply }: Props) {
       name,
       ...current,
     }
+    const mpg = parseOptionalNumber(newMpg)
+    const tank = parseOptionalNumber(newTank)
+    if (mpg !== undefined) profile.mpg = mpg
+    if (tank !== undefined) profile.tankSizeGallons = tank
     saveVehicleProfile(profile)
     refresh()
     setNewName('')
+    setNewMpg('')
+    setNewTank('')
     setShowSaveForm(false)
   }
 
   function handleDelete(id: string) {
     deleteVehicleProfile(id)
     refresh()
+  }
+
+  function fuelSummary(v: VehicleProfile): string {
+    if (v.mpg && v.tankSizeGallons) {
+      const range = Math.round(v.mpg * v.tankSizeGallons)
+      return `${v.mpg} mpg · ${v.tankSizeGallons} gal · ~${range} mi`
+    }
+    return ''
   }
 
   return (
@@ -86,6 +113,7 @@ export default function VehicleProfilePicker({ current, onApply }: Props) {
         <div className="vehicle-profile__save">
           <input
             type="text"
+            className="vehicle-profile__name-input"
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
             placeholder="My Truck, Wife's Sedan, etc."
@@ -96,6 +124,36 @@ export default function VehicleProfilePicker({ current, onApply }: Props) {
               }
             }}
           />
+          <div className="vehicle-profile__fuel-row">
+            <label className="field field--inline">
+              <span>MPG (optional)</span>
+              <input
+                type="number"
+                inputMode="decimal"
+                min="1"
+                step="0.1"
+                value={newMpg}
+                onChange={(e) => setNewMpg(e.target.value)}
+                placeholder="e.g. 25"
+              />
+            </label>
+            <label className="field field--inline">
+              <span>Tank size, gal (optional)</span>
+              <input
+                type="number"
+                inputMode="decimal"
+                min="1"
+                step="0.1"
+                value={newTank}
+                onChange={(e) => setNewTank(e.target.value)}
+                placeholder="e.g. 15"
+              />
+            </label>
+          </div>
+          <p className="muted small vehicle-profile__fuel-hint">
+            Provide both MPG and tank size to enable fuel-aware route suggestions.
+            Leave blank to skip this feature.
+          </p>
           <button
             type="button"
             className="btn btn--primary btn--small"
@@ -111,12 +169,20 @@ export default function VehicleProfilePicker({ current, onApply }: Props) {
         <ul className="vehicle-profile__list">
           {vehicles.map((v) => (
             <li key={v.id}>
-              <span className="vehicle-profile__name">{v.name}</span>
-              <span className="vehicle-profile__summary mono small">
-                {v.vehicleHasSeparateTrunk ? 'trunk' : 'no trunk'}
-                {' · '}
-                {v.lockedContainerUsed ? 'locked' : 'unlocked'}
-              </span>
+              <div className="vehicle-profile__entry">
+                <span className="vehicle-profile__name">{v.name}</span>
+                <span className="vehicle-profile__summary mono small">
+                  {v.vehicleHasSeparateTrunk ? 'trunk' : 'no trunk'}
+                  {' · '}
+                  {v.lockedContainerUsed ? 'locked' : 'unlocked'}
+                  {fuelSummary(v) && (
+                    <>
+                      {' · '}
+                      {fuelSummary(v)}
+                    </>
+                  )}
+                </span>
+              </div>
               <button
                 type="button"
                 className="icon-btn icon-btn--danger"
