@@ -6,17 +6,22 @@ import StateLawPanel from './components/StateLawPanel'
 import FopaPanel from './components/FopaPanel'
 import StopsPanel from './components/StopsPanel'
 import ExportPanel from './components/ExportPanel'
-import { MOCK_STOPS } from './data/mockStops'
 import { evaluateFopa } from './rules/evaluateFopa'
 import { evaluateReciprocity } from './rules/evaluateReciprocity'
 import { evaluateRestrictions } from './rules/evaluateRestrictions'
 import { scoreRouteRisk } from './rules/scoreRouteRisk'
 import { generateChecklist } from './utils/checklist'
-import { getDirections, type DirectionsRoute } from './services/mapboxClient'
+import {
+  getDirections,
+  getStopsAlongRoute,
+  type DirectionsRoute,
+  type StopFromApi,
+} from './services/mapboxClient'
 import {
   tripDestination,
   tripOrigin,
   type RouteOption,
+  type StopRecommendation,
   type TripInput,
 } from './types/domain'
 
@@ -51,6 +56,10 @@ export default function App() {
   const [selectedRouteId, setSelectedRouteId] = useState<string>('')
   const [selectedStopIds, setSelectedStopIds] = useState<string[]>([])
 
+  // Suggested refueling stops along the currently-selected route.
+  const [suggestedStops, setSuggestedStops] = useState<StopRecommendation[]>([])
+  const [stopsLoading, setStopsLoading] = useState(false)
+
   // Fetch directions whenever a trip is submitted. Passes every stop's
   // coordinates to the Pages Function so the route honors waypoints.
   useEffect(() => {
@@ -82,6 +91,33 @@ export default function App() {
     }
   }, [trip])
 
+  // Fetch suggested refueling stops along the selected route. Re-runs
+  // whenever the route changes (new trip or alternate route picked).
+  useEffect(() => {
+    const route = routes.find((r) => r.id === selectedRouteId) ?? routes[0]
+    if (!route || route.samples.length === 0) {
+      setSuggestedStops([])
+      return
+    }
+    let cancelled = false
+    setStopsLoading(true)
+    getStopsAlongRoute(route.samples.map((s) => ({ lng: s.lng, lat: s.lat })))
+      .then((apiStops: StopFromApi[]) => {
+        if (cancelled) return
+        // Convert StopFromApi -> StopRecommendation. The shapes are
+        // identical so this is just a type assertion in practice.
+        setSuggestedStops(apiStops as StopRecommendation[])
+      })
+      .catch(() => {
+        if (cancelled) return
+        setSuggestedStops([])
+      })
+      .finally(() => !cancelled && setStopsLoading(false))
+    return () => {
+      cancelled = true
+    }
+  }, [routes, selectedRouteId])
+
   const evaluation = useMemo(() => {
     if (!trip || routes.length === 0) return null
     const route = routes.find((r) => r.id === selectedRouteId) ?? routes[0]
@@ -108,7 +144,7 @@ export default function App() {
     )
   }
 
-  const selectedSuggestedStops = MOCK_STOPS.filter((s) => selectedStopIds.includes(s.id))
+  const selectedSuggestedStops = suggestedStops.filter((s) => selectedStopIds.includes(s.id))
 
   // For exports, pass the full trip: origin, user-planned waypoints, then
   // any selected suggested refueling stops, and finally the destination.
@@ -187,7 +223,8 @@ export default function App() {
             />
 
             <StopsPanel
-              stops={MOCK_STOPS}
+              stops={suggestedStops}
+              loading={stopsLoading}
               selectedStopIds={selectedStopIds}
               onToggleSelect={toggleStop}
             />

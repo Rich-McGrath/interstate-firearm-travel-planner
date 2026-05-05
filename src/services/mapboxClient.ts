@@ -43,3 +43,37 @@ export async function getDirections(
   const data = (await resp.json()) as { routes?: DirectionsRoute[] }
   return data.routes ?? []
 }
+
+// Stop response shape coming back from /api/stops. Matches
+// StopRecommendation in domain.ts (the score/label/reasons fields are
+// recomputed client-side by scoreStops).
+export interface StopFromApi {
+  id: string
+  name: string
+  category: 'gas' | 'food' | 'gas_food'
+  address: string
+  lat: number
+  lng: number
+  distanceOffRouteMiles: number
+  rating?: number
+  reviewCount?: number
+  isOpenNow?: boolean
+  chainBrand?: boolean
+  inCommercialCorridor?: boolean
+  score: number
+  label: 'recommended' | 'better_traffic' | 'manual_review'
+  reasons: string[]
+}
+
+export async function getStopsAlongRoute(
+  samples: { lng: number; lat: number }[],
+  signal?: AbortSignal
+): Promise<StopFromApi[]> {
+  if (samples.length < 1) return []
+  const coords = samples.map((s) => `${s.lng},${s.lat}`).join(';')
+  const params = new URLSearchParams({ coords })
+  const resp = await fetch(`/api/stops?${params.toString()}`, { signal })
+  if (!resp.ok) throw new Error(`stops failed: ${resp.status}`)
+  const data = (await resp.json()) as { stops?: StopFromApi[] }
+  return data.stops ?? []
+}

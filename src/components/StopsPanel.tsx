@@ -12,12 +12,14 @@ import {
 
 interface Props {
   stops: StopRecommendation[]
+  loading?: boolean
   selectedStopIds: string[]
   onToggleSelect: (id: string) => void
 }
 
 export default function StopsPanel({
   stops,
+  loading,
   selectedStopIds,
   onToggleSelect,
 }: Props) {
@@ -86,14 +88,21 @@ export default function StopsPanel({
         </label>
       </div>
 
-      <ul className="stops-list">
-        {scored.map((stop) => {
-          const selected = selectedStopIds.includes(stop.id)
-          return (
-            <li
-              key={stop.id}
-              className={`stop-card ${selected ? 'is-selected' : ''}`}
-            >
+      {loading && stops.length === 0 ? (
+        <p className="muted">Finding stops along the route…</p>
+      ) : !loading && stops.length === 0 ? (
+        <p className="muted">No stops found along this route.</p>
+      ) : scored.length === 0 ? (
+        <p className="muted">No stops match the current filters.</p>
+      ) : (
+        <ul className="stops-list">
+          {scored.map((stop) => {
+            const selected = selectedStopIds.includes(stop.id)
+            return (
+              <li
+                key={stop.id}
+                className={`stop-card ${selected ? 'is-selected' : ''}`}
+              >
               <header className="stop-card__header">
                 <h3>{stop.name}</h3>
                 <span className={`badge ${stopLabelClassName(stop.label)}`}>
@@ -138,7 +147,8 @@ export default function StopsPanel({
             </li>
           )
         })}
-      </ul>
+        </ul>
+      )}
     </section>
   )
 }
