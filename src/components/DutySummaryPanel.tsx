@@ -41,9 +41,9 @@ export default function DutySummaryPanel({ routeStates }: Props) {
   return (
     <section className="card duty-panel">
       <header className="card__header">
-        <h2>Duty to inform · by state</h2>
+        <h2>Duty to Inform · By State</h2>
         <span className="muted mono small">
-          Grouped from {routeStates.length} states on route
+          Grouped From {routeStates.length} States On Route
         </span>
       </header>
 

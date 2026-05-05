@@ -10,6 +10,7 @@ import type {
 } from '../types/domain'
 import type { EnrichedStop } from '../rules/enrichStops'
 import { riskLevelForState } from '../rules/riskLevelForState'
+import { getStateProfile } from '../data/states'
 
 interface Props {
   route: RouteOption
@@ -39,11 +40,28 @@ const STOP_FILL_SELECTED = '#e0a82e'
 const STOP_STROKE = '#e0a82e'
 const STOP_STROKE_HOVERED = '#fbe5a2'
 
+// State overlay colors. Both are "high caution" but visually distinct.
+// Strict states (where carry recognition itself is the issue, e.g. NJ,
+// NY, CA, MA) use a deep red — the strongest visual signal because the
+// permit may not work at all. Duty-to-inform states use orange — also a
+// caution color, but weaker, signaling "you can carry but pay attention
+// to the conversation with LE."
+const STRICT_STATE_COLOR = '#d44545' // deep red
+const DUTY_STATE_COLOR = '#e08a2e' // orange (distinct from amber waypoint pins)
+
 // Layer / source IDs — kept as constants so add/remove logic stays in sync.
 const SRC_STOPS = 'suggested-stops-src'
 const LYR_STOPS_CLUSTERS = 'suggested-stops-clusters'
 const LYR_STOPS_CLUSTER_COUNT = 'suggested-stops-cluster-count'
 const LYR_STOPS_POINTS = 'suggested-stops-points'
+
+// State-overlay layer IDs. Both layers query Mapbox's built-in `admin`
+// source (line geometry, no fills) and use a filter to highlight only
+// the relevant states. We draw two layers because the colors must
+// differ. Strict states render after duty states so the stricter
+// signal wins where a state qualifies for both.
+const LYR_DUTY_OUTLINE = 'duty-state-outline'
+const LYR_STRICT_OUTLINE = 'strict-state-outline'
 
 export default function RouteMap({
   route,
@@ -168,6 +186,7 @@ export default function RouteMap({
     if (!map) return
     const apply = () => {
       drawRoute(map, route, reciprocity, restrictions)
+      drawStateOverlays(map, route.statesCrossed)
       drawTripMarkers(map, stops, tripMarkersRef)
       fitToRoute(map, route)
     }
@@ -215,13 +234,19 @@ export default function RouteMap({
               <i className="route-map-legend__stop" />Stops
             </span>
           )}
+          <span className="route-map-legend__item route-map-legend__item--strict">
+            <i className="route-map-legend__strict" />Strict state
+          </span>
+          <span className="route-map-legend__item route-map-legend__item--duty">
+            <i className="route-map-legend__duty" />Duty-to-inform
+          </span>
         </span>
       </header>
       <div className="route-map" ref={containerRef} />
       {suggestedStops.length > 0 && (
         <p className="route-map__hint muted small">
           Numbered teardrops are your trip waypoints. Small dots are suggested
-          refueling stops — click any dot to add it. <span className="mono">+N</span>{' '}
+          refueling stops — click any dot to add it. <span className="mono">+</span>{' '}
           badges hide multiple stops; click to zoom in.
         </p>
       )}
@@ -276,6 +301,93 @@ function drawRoute(
       paint: { 'line-color': color, 'line-width': 4, 'line-opacity': 0.92 },
     })
   })
+}
+
+// Highlight state borders for any state on the route that triggers a
+// caution flag — either strict-policy (carry recognition is the issue)
+// or duty-to-inform (must volunteer carry status, or inform if asked).
+//
+// Implementation note: we leverage Mapbox's built-in `admin` source-layer
+// from the `composite` source that every default style ships with. The
+// admin layer is line-only — country/state/county borders, no fills.
+// We add two new layers that filter the same source by `iso_3166_2`,
+// with a thicker stroke and our caution colors. No external GeoJSON
+// needed; no extra network requests; no token-scope changes.
+function drawStateOverlays(
+  map: mapboxgl.Map,
+  routeStates: string[]
+) {
+  // Remove any prior overlay layers cleanly so re-renders don't stack.
+  for (const id of [LYR_DUTY_OUTLINE, LYR_STRICT_OUTLINE]) {
+    if (map.getLayer(id)) map.removeLayer(id)
+  }
+
+  // Classify route states. Strict wins over duty when both apply (e.g.
+  // NJ qualifies as both restrictive AND duty-to-inform=manual_review;
+  // we want it red, not orange).
+  const strict: string[] = []
+  const dutyOnly: string[] = []
+  for (const code of routeStates) {
+    const profile = getStateProfile(code.toUpperCase())
+    if (!profile) continue
+    const isStrict =
+      !!profile.hasAssaultWeaponBan ||
+      !!profile.hasSpecialTransportRules ||
+      profile.dutyToInform === 'manual_review' // proxy for restrictive policy
+    const isDuty =
+      profile.dutyToInform === 'must_inform' ||
+      profile.dutyToInform === 'inform_if_asked'
+    if (isStrict) strict.push(`US-${code.toUpperCase()}`)
+    else if (isDuty) dutyOnly.push(`US-${code.toUpperCase()}`)
+  }
+
+  // The `admin` source-layer is part of `composite` in every Mapbox
+  // default style. `admin_level === 1` is states/provinces.
+  // `iso_3166_2` matches "US-XX" form. `worldview === 'all'` keeps the
+  // filter portable across worldview-specific tiles.
+  if (dutyOnly.length > 0) {
+    map.addLayer({
+      id: LYR_DUTY_OUTLINE,
+      type: 'line',
+      source: 'composite',
+      'source-layer': 'admin',
+      filter: [
+        'all',
+        ['==', ['get', 'admin_level'], 1],
+        ['in', ['get', 'iso_3166_2'], ['literal', dutyOnly]],
+      ],
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: {
+        'line-color': DUTY_STATE_COLOR,
+        'line-width': 4,
+        'line-opacity': 0.85,
+        'line-dasharray': [2, 2],
+      },
+    })
+  }
+
+  if (strict.length > 0) {
+    map.addLayer({
+      id: LYR_STRICT_OUTLINE,
+      type: 'line',
+      source: 'composite',
+      'source-layer': 'admin',
+      filter: [
+        'all',
+        ['==', ['get', 'admin_level'], 1],
+        ['in', ['get', 'iso_3166_2'], ['literal', strict]],
+      ],
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: {
+        'line-color': STRICT_STATE_COLOR,
+        'line-width': 5,
+        'line-opacity': 0.95,
+        // Solid line — strict states get the unbroken outline since
+        // they're the more serious signal; the dashed duty line keeps
+        // them visually distinct at a glance.
+      },
+    })
+  }
 }
 
 function drawTripMarkers(

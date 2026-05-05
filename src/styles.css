@@ -2121,6 +2121,31 @@ p { margin: 0 0 0.8em; color: var(--cream-1); }
   height: 0.7rem;
 }
 
+/* Strict-state outline legend swatch — solid red bar */
+.route-map-legend__item--strict i.route-map-legend__strict {
+  background: #d44545;
+  width: 0.95rem;
+  height: 0.32rem;
+  border-radius: 1px;
+}
+
+/* Duty-to-inform outline legend swatch — dashed orange bar */
+.route-map-legend__item--duty i.route-map-legend__duty {
+  background: transparent;
+  width: 0.95rem;
+  height: 0.32rem;
+  border-radius: 1px;
+  background-image: linear-gradient(
+    to right,
+    #e08a2e 0,
+    #e08a2e 50%,
+    transparent 50%,
+    transparent 100%
+  );
+  background-size: 0.32rem 100%;
+  background-repeat: repeat-x;
+}
+
 /* Hint line under the map */
 .route-map__hint {
   margin: 0.5rem 0 0;

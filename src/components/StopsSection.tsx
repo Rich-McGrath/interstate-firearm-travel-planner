@@ -89,7 +89,7 @@ export default function StopsSection({
   return (
     <section className="card stops-section">
       <header className="card__header stops-section__header">
-        <h2>Route &amp; refueling stops</h2>
+        <h2>Route &amp; Refueling Stops</h2>
         <span className="muted">
           {totalCount === 0 && !loading
             ? 'No stops along route'

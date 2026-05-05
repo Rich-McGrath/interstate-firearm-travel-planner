@@ -65,10 +65,10 @@ export default function ExportPanel({
   return (
     <section className="card">
       <header className="card__header">
-        <h2>Export &amp; checklist</h2>
+        <h2>Export &amp; Checklist</h2>
         {allWaypoints.length > 0 && (
           <span className="muted mono small">
-            {userWaypoints.length} planned · {suggestedStops.length} suggested
+            {userWaypoints.length} Planned · {suggestedStops.length} Suggested
           </span>
         )}
       </header>
@@ -103,7 +103,7 @@ export default function ExportPanel({
       </p>
 
       <div className="card__section">
-        <h3>Before-you-travel checklist</h3>
+        <h3>Before-You-Travel Checklist</h3>
         <ul className="bullet-list">
           {checklist.map((c) => (
             <li key={c}>{c}</li>

@@ -46,8 +46,8 @@ export default function StateLawPanel({
   return (
     <section className="card">
       <header className="card__header">
-        <h2>State analysis</h2>
-        <span className="muted mono">{routeStates.length} states on route · highest risk first</span>
+        <h2>State Analysis</h2>
+        <span className="muted mono">{routeStates.length} States On Route · Highest Risk First</span>
       </header>
 
       <div className="state-grid">

@@ -88,7 +88,7 @@ export default function RouteAndFopaPanel({
   return (
     <section className="card combined-panel">
       <header className="card__header">
-        <h2>Route &amp; FOPA (§ 926A) analysis</h2>
+        <h2>Route &amp; FOPA Analysis</h2>
         <div className="combined-panel__badges">
           <span className={`badge ${riskClassName(computedRiskLevel)}`}>
             Route: {formatRiskLevel(computedRiskLevel)} · {computedRiskScore}/100
@@ -157,7 +157,7 @@ export default function RouteAndFopaPanel({
 
         {!simple && computedRiskReasons.length > 0 && (
           <div className="card__section">
-            <h3>Risk reasons</h3>
+            <h3>Risk Reasons</h3>
             <ul className="bullet-list">
               {computedRiskReasons.map((reason) => (
                 <li key={reason}>{reason}</li>
@@ -186,7 +186,7 @@ export default function RouteAndFopaPanel({
             </div>
 
             <div>
-              <h3>Required conditions</h3>
+              <h3>Required Conditions</h3>
               <ul className="bullet-list">
                 {fopa.requiredConditions.map((r) => (
                   <li key={r}>{r}</li>

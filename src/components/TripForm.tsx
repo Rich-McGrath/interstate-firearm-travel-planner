@@ -141,7 +141,7 @@ export default function TripForm({ onSubmit, initial }: Props) {
 
   return (
     <form className="trip-form" onSubmit={handleSubmit} noValidate>
-      <h2 className="trip-form__title">Trip details</h2>
+      <h2 className="trip-form__title">Trip Details</h2>
 
       <fieldset className="fieldset">
         <legend>Stops · drag to reorder</legend>
