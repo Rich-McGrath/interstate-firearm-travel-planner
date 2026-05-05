@@ -1873,13 +1873,41 @@ p { margin: 0 0 0.8em; color: var(--cream-1); }
   transform: translateY(-1px);
 }
 
-/* Legend entry for stop pins on the map */
+/* Waypoint pins on the map — distinct teardrop shape, drop shadow for
+   readability over the route polyline */
+.waypoint-pin {
+  cursor: pointer;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.55));
+  transition: transform 0.15s;
+}
+
+.waypoint-pin:hover {
+  transform: translateY(-2px);
+}
+
+/* Legend swatches — waypoint as a small teardrop, stop as a small ring */
+.route-map-legend__item--waypoint i.route-map-legend__waypoint {
+  background: transparent;
+  position: relative;
+  width: 0.7rem;
+  height: 1rem;
+}
+
+.route-map-legend__item--waypoint i.route-map-legend__waypoint::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--amber);
+  /* Rough teardrop shape using a clip-path triangle on the bottom */
+  clip-path: polygon(50% 100%, 0% 50%, 0% 20%, 20% 0%, 80% 0%, 100% 20%, 100% 50%);
+}
+
 .route-map-legend__item--stop i.route-map-legend__stop {
   background: transparent;
   border: 2px solid var(--amber);
   border-radius: 50%;
-  width: 0.85rem;
-  height: 0.85rem;
+  width: 0.7rem;
+  height: 0.7rem;
 }
 
 /* Hint line under the map */

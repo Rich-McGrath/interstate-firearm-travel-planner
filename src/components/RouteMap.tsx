@@ -34,7 +34,6 @@ const RISK_COLORS: Record<RiskLevel, string> = {
   manual_review: '#8b95a5',
 }
 
-const TRIP_PIN_COLOR = '#e0a82e'
 const STOP_FILL_UNSELECTED = '#1a2330'
 const STOP_FILL_SELECTED = '#e0a82e'
 const STOP_STROKE = '#e0a82e'
@@ -208,6 +207,9 @@ export default function RouteMap({
           <span className="route-map-legend__item"><i style={{ background: RISK_COLORS.caution }} />Caution</span>
           <span className="route-map-legend__item"><i style={{ background: RISK_COLORS.high }} />Higher</span>
           <span className="route-map-legend__item"><i style={{ background: RISK_COLORS.manual_review }} />Manual</span>
+          <span className="route-map-legend__item route-map-legend__item--waypoint">
+            <i className="route-map-legend__waypoint" />Waypoints
+          </span>
           {suggestedStops.length > 0 && (
             <span className="route-map-legend__item route-map-legend__item--stop">
               <i className="route-map-legend__stop" />Stops
@@ -218,7 +220,9 @@ export default function RouteMap({
       <div className="route-map" ref={containerRef} />
       {suggestedStops.length > 0 && (
         <p className="route-map__hint muted small">
-          Click a pin to see details and add the stop to your trip. Hover to highlight in the list below.
+          Numbered teardrops are your trip waypoints. Small dots are suggested
+          refueling stops — click any dot to add it. <span className="mono">+N</span>{' '}
+          badges hide multiple stops; click to zoom in.
         </p>
       )}
     </section>
@@ -284,20 +288,38 @@ function drawTripMarkers(
   stops.forEach((s, i) => {
     if (!s.coords) return
     const role = i === 0 ? 'Origin' : i === stops.length - 1 ? 'Destination' : `Stop ${i}`
-    const el = document.createElement('div')
-    el.className = 'map-pin'
-    el.style.background = TRIP_PIN_COLOR
-    el.textContent = String(i + 1)
-    const marker = new mapboxgl.Marker({ element: el })
+    const el = buildWaypointPin(i + 1, role)
+    const marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
       .setLngLat([s.coords.lng, s.coords.lat])
       .setPopup(
-        new mapboxgl.Popup({ offset: 16, closeButton: false }).setHTML(
+        new mapboxgl.Popup({ offset: 26, closeButton: false }).setHTML(
           `<div class="map-popup"><div class="map-popup__role">${role}</div><div class="map-popup__label">${escapeHtml(s.label)}</div></div>`
         )
       )
       .addTo(map)
     ref.current.push(marker)
   })
+}
+
+// Tall pin SVG: amber teardrop with a numbered circle. Anchored at the
+// tip (bottom) so the visual point sits exactly on the coordinate.
+// Distinct from suggested-stop dots so users immediately read it as
+// "your trip waypoint" not "a suggested refueling option."
+function buildWaypointPin(number: number, role: string): HTMLElement {
+  const el = document.createElement('div')
+  el.className = 'waypoint-pin'
+  el.setAttribute('role', 'img')
+  el.setAttribute('aria-label', `${role} (waypoint ${number})`)
+  el.innerHTML = `
+    <svg viewBox="0 0 28 40" width="28" height="40" xmlns="http://www.w3.org/2000/svg">
+      <path d="M14 0 C6.27 0 0 6.27 0 14 C0 24.5 14 40 14 40 C14 40 28 24.5 28 14 C28 6.27 21.73 0 14 0 Z"
+            fill="#e0a82e" stroke="#3a2a0a" stroke-width="1.5"/>
+      <circle cx="14" cy="14" r="8.5" fill="#1a1208"/>
+      <text x="14" y="18" text-anchor="middle" font-family="JetBrains Mono, monospace"
+            font-size="11" font-weight="700" fill="#e0a82e">${number}</text>
+    </svg>
+  `
+  return el
 }
 
 function fitToRoute(map: mapboxgl.Map, route: RouteOption) {
@@ -339,32 +361,45 @@ function upsertStopsLayer(
     return
   }
 
-  // First-time setup of source + 3 layers (cluster bubbles, cluster
-  // counts, individual stop circles).
+  // First-time setup of source + 3 layers (cluster badges, cluster
+  // counts, individual stop dots).
+  //
+  // clusterMaxZoom is set high (14) so clustering only fires at very low
+  // zoom — when viewing a multi-state route at continent scale. As soon
+  // as the user zooms to anything closer than "see two states at once,"
+  // individual stop dots appear and become directly clickable.
+  // clusterRadius is small (24px) so dots are eager to break apart.
   map.addSource(SRC_STOPS, {
     type: 'geojson',
     data: fc,
     cluster: true,
-    clusterMaxZoom: 11,
-    clusterRadius: 40,
+    clusterMaxZoom: 14,
+    clusterRadius: 24,
   })
 
+  // Cluster badges: square-rounded amber-bordered tile. Distinct shape
+  // from waypoint pins (which are tall teardrops) and individual stop
+  // dots (which are small circles). The square shape signals "this is a
+  // count, not a stop."
   map.addLayer({
     id: LYR_STOPS_CLUSTERS,
     type: 'circle',
     source: SRC_STOPS,
     filter: ['has', 'point_count'],
     paint: {
-      'circle-color': '#1a2330',
+      'circle-color': '#1a1208',
       'circle-stroke-color': STOP_STROKE,
-      'circle-stroke-width': 2,
+      'circle-stroke-width': 1.5,
+      // Use a wider/larger circle so the "+N" text fits comfortably,
+      // and so it visually reads more like a label than a pin.
       'circle-radius': [
         'step',
         ['get', 'point_count'],
-        14, 5,
-        18, 15,
-        22,
+        13, 5,
+        16, 15,
+        19,
       ],
+      'circle-opacity': 0.92,
     },
   })
 
@@ -374,9 +409,12 @@ function upsertStopsLayer(
     source: SRC_STOPS,
     filter: ['has', 'point_count'],
     layout: {
-      'text-field': ['get', 'point_count_abbreviated'],
+      // Prefix with "+" so it visually distinguishes from the numbered
+      // waypoint pins ("1", "2", etc.). "+5" reads as "5 more" not "stop 5."
+      'text-field': ['concat', '+', ['get', 'point_count_abbreviated']],
       'text-font': ['DIN Offc Pro Medium', 'Arial Unicode MS Bold'],
-      'text-size': 12,
+      'text-size': 11,
+      'text-allow-overlap': true,
     },
     paint: {
       'text-color': STOP_STROKE,
@@ -400,16 +438,20 @@ function upsertStopsLayer(
         ['==', ['get', 'hovered'], 1], STOP_STROKE_HOVERED,
         STOP_STROKE,
       ],
-      // Hovered stops are larger so they pop visually.
+      // Smaller default radius so individual stops read as "click me"
+      // dots rather than "I'm a major waypoint" pins. Hover state grows
+      // them noticeably for feedback.
       'circle-radius': [
         'case',
-        ['==', ['get', 'hovered'], 1], 9,
-        7,
+        ['==', ['get', 'hovered'], 1], 8,
+        ['==', ['get', 'selected'], 1], 6.5,
+        5,
       ],
       'circle-stroke-width': [
         'case',
-        ['==', ['get', 'hovered'], 1], 3,
-        2,
+        ['==', ['get', 'hovered'], 1], 2.5,
+        ['==', ['get', 'selected'], 1], 2,
+        1.5,
       ],
     },
   })
