@@ -45,14 +45,20 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     return json({ error: 'server misconfigured' }, 500)
   }
 
-  // Restrict to US, prioritize places with addresses, return up to 5.
+  // Mapbox's autocomplete mode performs prefix matching, which works for
+  // "san anto..." but returns fuzzy results for queries containing a
+  // house number ("18015 Kyle Seale Parkway"). When digits are present,
+  // switch to precise matching so the address resolves correctly.
+  const hasDigits = /\d/.test(q)
+
+  // Restrict to US, prioritize places with addresses, return up to 6.
   const mapboxUrl = new URL(
     `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(q)}.json`
   )
   mapboxUrl.searchParams.set('access_token', env.MAPBOX_TOKEN)
   mapboxUrl.searchParams.set('country', 'US')
   mapboxUrl.searchParams.set('types', 'place,locality,neighborhood,address,postcode,poi')
-  mapboxUrl.searchParams.set('autocomplete', 'true')
+  mapboxUrl.searchParams.set('autocomplete', hasDigits ? 'false' : 'true')
   mapboxUrl.searchParams.set('limit', '6')
 
   const resp = await fetch(mapboxUrl.toString(), {
