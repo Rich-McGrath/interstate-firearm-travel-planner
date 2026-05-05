@@ -1,7 +1,18 @@
 // Cloudflare Pages Function — proxies Mapbox Directions for trips with
 // any number of stops (origin, optional waypoints, destination).
 // Mapbox does not return states-crossed directly, so we sample points
-// along the route geometry and reverse-geocode each to its region.
+// along the route geometry and label each with its containing state.
+//
+// State labeling uses local point-in-polygon against the same TopoJSON
+// the client uses for the map overlay (see _states.ts). This replaced
+// an earlier implementation that did one Mapbox reverse-geocode call
+// per sample — that hit Cloudflare's 50-subrequest free-plan ceiling on
+// long routes (a 2000-mile trip with alternatives needed ~89 subrequests
+// and 500'd) and burned through Mapbox's geocoding quota for what is
+// just a geometry problem.
+
+import { findStateCode, loadStatePolygons } from './_states'
+import type { IndexedFeature } from './_pip'
 
 interface Env {
   MAPBOX_TOKEN: string
@@ -15,15 +26,6 @@ interface MapboxRoute {
 
 interface MapboxDirectionsResponse {
   routes: MapboxRoute[]
-}
-
-interface ReverseFeature {
-  context?: { id: string; short_code?: string }[]
-  properties?: { short_code?: string }
-}
-
-interface ReverseResponse {
-  features: ReverseFeature[]
 }
 
 export interface RouteSample {
@@ -100,22 +102,29 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     return json({ error: 'no route found' }, 404)
   }
 
-  // 2. For each route, sample points along the geometry and reverse-geocode
-  //    to extract the ordered list of states crossed. Sample count scales
-  //    with route length so that long routes don't undersample (causing
-  //    states like Indiana or Missouri — which a route may only briefly
-  //    transit — to be missed entirely). Mapbox's reverse-geocode is rate
-  //    limited so we keep the cap reasonable; ~one sample every 50 miles
-  //    is dense enough to catch a thin transit through any state, and on
-  //    a 3000-mile cross-country route that's 60 calls per route, well
-  //    within Mapbox's free-tier limits.
+  // 2. Load state polygons once (module-cached after the first call)
+  //    and label every sample locally. If polygon loading fails for
+  //    any reason — bad fetch, malformed topology — fall back to
+  //    routes without state assignments rather than 500'ing. The
+  //    client/rules pipeline treats missing stateCode as
+  //    'manual_review' per data conventions, which is the right
+  //    fail-safe.
+  let polygonIndex: IndexedFeature[] | undefined
+  try {
+    polygonIndex = await loadStatePolygons(request.url)
+  } catch (err) {
+    console.error('state polygon load failed; routes will be returned without state info', err)
+  }
+
+  // 3. For each route, sample points along the geometry and assign
+  //    states via PIP. Sample count scales with route length so long
+  //    routes don't undersample (causing states like Indiana or
+  //    Missouri — which a route may only briefly transit — to be
+  //    missed). PIP is local CPU work, so we keep the historical
+  //    density: ~one sample per 50 miles, floor 12, cap 80.
   const routes: DirectionsResult[] = []
   for (const r of dirData.routes.slice(0, 2)) {
     const distanceMiles = r.distance / 1609.34
-    // Roughly 1 sample per 50 miles; floor at 12 (short trips still
-    // need decent coverage), cap at 80 (don't blow up on 4000-mile
-    // routes). Scales with stop count too, since waypoints can add
-    // detours that cross extra states.
     const sampleCount = Math.max(
       12,
       Math.min(80, Math.round(distanceMiles / 50) + coords.length * 2)
@@ -126,9 +135,8 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     const states: string[] = []
     for (const idx of sampleIndices) {
       const [lng, lat] = points[idx]!
-      // eslint-disable-next-line no-await-in-loop
-      const stateCode = await reverseGeocodeState(lng, lat, env.MAPBOX_TOKEN)
       const sample: RouteSample = { polylineIndex: idx, lng, lat }
+      const stateCode = polygonIndex ? findStateCode(lng, lat, polygonIndex) : undefined
       if (stateCode) {
         sample.stateCode = stateCode
         if (states[states.length - 1] !== stateCode) states.push(stateCode)
@@ -212,32 +220,6 @@ function decodePolyline(str: string): [number, number][] {
     points.push([lng / 1e5, lat / 1e5])
   }
   return points
-}
-
-async function reverseGeocodeState(
-  lng: number,
-  lat: number,
-  token: string
-): Promise<string | undefined> {
-  const u = new URL(
-    `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json`
-  )
-  u.searchParams.set('access_token', token)
-  u.searchParams.set('types', 'region')
-  u.searchParams.set('country', 'US')
-  u.searchParams.set('limit', '1')
-
-  const resp = await fetch(u.toString(), {
-    cf: { cacheTtl: 86400, cacheEverything: true },
-  })
-  if (!resp.ok) return undefined
-  const data = (await resp.json()) as ReverseResponse
-  const f = data.features[0]
-  if (!f) return undefined
-  const sc = f.properties?.short_code ?? f.context?.find((c) => c.id.startsWith('region'))?.short_code
-  if (!sc) return undefined
-  const parts = sc.split('-')
-  return parts[1]?.toUpperCase()
 }
 
 function json(body: unknown, status = 200): Response {
