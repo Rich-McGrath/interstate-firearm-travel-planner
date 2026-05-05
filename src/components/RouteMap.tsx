@@ -41,14 +41,16 @@ const STOP_FILL_SELECTED = '#e0a82e'
 const STOP_STROKE = '#e0a82e'
 const STOP_STROKE_HOVERED = '#fbe5a2'
 
-// State overlay colors. Both are "high caution" but visually distinct.
-// Strict states (where carry recognition itself is the issue, e.g. NJ,
-// NY, CA, MA) use a deep red — the strongest visual signal because the
-// permit may not work at all. Duty-to-inform states use orange — also a
-// caution color, but weaker, signaling "you can carry but pay attention
-// to the conversation with LE."
+// State overlay colors. Three tiers, intentionally with descending
+// visual weight so warnings dominate the visual hierarchy:
+//   - Strict states (red): permit may not be recognized at all
+//   - Duty-to-inform states (orange): carry allowed, manage the LE conversation
+//   - Lower-risk states (green): no flagged concerns; positive confirmation
+// Strict and duty fills are 18-22% opacity; lower-risk is 8% so it
+// reads as a quiet background tint rather than a focal point.
 const STRICT_STATE_COLOR = '#d44545' // deep red
 const DUTY_STATE_COLOR = '#e08a2e' // orange (distinct from amber waypoint pins)
+const LOWER_STATE_COLOR = '#5dd498' // soft green (matches risk-low)
 
 // Layer / source IDs — kept as constants so add/remove logic stays in sync.
 const SRC_STOPS = 'suggested-stops-src'
@@ -59,10 +61,13 @@ const LYR_STOPS_POINTS = 'suggested-stops-points'
 // State-overlay layer + source IDs. We back these with a GeoJSON
 // FeatureCollection of US state polygons (loaded from the public
 // `us-atlas` TopoJSON, converted client-side once on first render).
-// Two filtered layers — one for strict-policy states, one for
-// duty-to-inform states — share the source. Strict layer renders on
-// top so its color wins where a state qualifies for both.
+// Three filtered layers — lower-risk, duty-to-inform, strict — share
+// the source. Layers paint in stacked order: lower-risk is added
+// first so it sits underneath, then duty, then strict on top, so the
+// stronger signal wins where a state qualifies as both.
 const SRC_STATES = 'us-states-src'
+const LYR_LOWER_FILL = 'lower-state-fill'
+const LYR_LOWER_OUTLINE = 'lower-state-outline'
 const LYR_DUTY_FILL = 'duty-state-fill'
 const LYR_DUTY_OUTLINE = 'duty-state-outline'
 const LYR_STRICT_FILL = 'strict-state-fill'
@@ -245,6 +250,9 @@ export default function RouteMap({
           <span className="route-map-legend__item route-map-legend__item--duty">
             <i className="route-map-legend__duty" />Duty-to-inform
           </span>
+          <span className="route-map-legend__item route-map-legend__item--lower">
+            <i className="route-map-legend__lower" />Lower-risk
+          </span>
         </span>
       </header>
       <div className="route-map" ref={containerRef} />
@@ -354,21 +362,18 @@ async function loadStatePolygons(): Promise<GeoJSON.FeatureCollection> {
   return statePolygonsPromise
 }
 
-// Highlight entire state polygons for any state on the route that
-// triggers a caution flag — either strict-policy (carry recognition is
-// the issue) or duty-to-inform (must volunteer carry status, or inform
-// if asked).
-//
-// Implementation: a single GeoJSON source backed by the us-atlas state
-// polygons, with two filtered layers (one for duty, one for strict)
-// that paint a transparent fill plus a more visible outline. Strict
-// fill renders on top so it wins when a state qualifies as both.
+// Highlight entire state polygons for every state on the route.
+// Three tiers:
+//   - Strict: permit recognition is the issue (red, ~22% fill)
+//   - Duty-to-inform: must volunteer or answer about carry (orange, ~18% fill)
+//   - Lower-risk: no flagged concerns (green, ~8% fill — quiet positive signal)
+// Layers render in ascending strength so the stronger signal wins
+// when a state qualifies for both (e.g. NJ is strict, not duty).
 async function drawStateOverlays(map: mapboxgl.Map, routeStates: string[]) {
-  // Classify route states. Strict wins over duty when both apply (e.g.
-  // NJ qualifies as both restrictive AND duty-to-inform=manual_review;
-  // we want it red, not orange).
+  // Classify every state on the route into exactly one bucket.
   const strict: string[] = []
   const dutyOnly: string[] = []
+  const lower: string[] = []
   for (const code of routeStates) {
     const profile = getStateProfile(code.toUpperCase())
     if (!profile) continue
@@ -381,17 +386,25 @@ async function drawStateOverlays(map: mapboxgl.Map, routeStates: string[]) {
       profile.dutyToInform === 'inform_if_asked'
     if (isStrict) strict.push(code.toUpperCase())
     else if (isDuty) dutyOnly.push(code.toUpperCase())
+    else lower.push(code.toUpperCase())
   }
 
   // Remove any prior overlay layers + source cleanly so re-renders
   // don't stack and so updated routes pick up the right filters.
-  for (const id of [LYR_STRICT_OUTLINE, LYR_STRICT_FILL, LYR_DUTY_OUTLINE, LYR_DUTY_FILL]) {
+  for (const id of [
+    LYR_STRICT_OUTLINE,
+    LYR_STRICT_FILL,
+    LYR_DUTY_OUTLINE,
+    LYR_DUTY_FILL,
+    LYR_LOWER_OUTLINE,
+    LYR_LOWER_FILL,
+  ]) {
     if (map.getLayer(id)) map.removeLayer(id)
   }
   if (map.getSource(SRC_STATES)) map.removeSource(SRC_STATES)
 
   // Nothing to highlight — done.
-  if (strict.length === 0 && dutyOnly.length === 0) return
+  if (strict.length === 0 && dutyOnly.length === 0 && lower.length === 0) return
 
   let polygons: GeoJSON.FeatureCollection
   try {
@@ -410,6 +423,41 @@ async function drawStateOverlays(map: mapboxgl.Map, routeStates: string[]) {
   // labels and route lines. Mapbox layers are drawn in order; we
   // want fills under road labels and the route polyline.
   const beforeLayerId = pickBeforeLayer(map)
+
+  // Lower-risk first (bottom of the stack). Subtle green tint and a
+  // thin solid outline. This is the "quiet positive signal" tier —
+  // quietly confirms the state was analyzed and looks fine, without
+  // competing with the orange/red warnings stacked above.
+  if (lower.length > 0) {
+    map.addLayer(
+      {
+        id: LYR_LOWER_FILL,
+        type: 'fill',
+        source: SRC_STATES,
+        filter: ['in', ['get', 'usps'], ['literal', lower]],
+        paint: {
+          'fill-color': LOWER_STATE_COLOR,
+          'fill-opacity': 0.08,
+        },
+      },
+      beforeLayerId
+    )
+    map.addLayer(
+      {
+        id: LYR_LOWER_OUTLINE,
+        type: 'line',
+        source: SRC_STATES,
+        filter: ['in', ['get', 'usps'], ['literal', lower]],
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: {
+          'line-color': LOWER_STATE_COLOR,
+          'line-width': 1.5,
+          'line-opacity': 0.65,
+        },
+      },
+      beforeLayerId
+    )
+  }
 
   if (dutyOnly.length > 0) {
     map.addLayer(
