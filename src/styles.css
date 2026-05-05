@@ -1147,6 +1147,93 @@ p { margin: 0 0 0.8em; color: var(--cream-1); }
 }
 
 /* =====================================================================
+   NFA / suppressor reminder
+   ===================================================================== */
+
+.nfa-reminder {
+  background: linear-gradient(135deg, var(--ink-2), var(--ink-1));
+  border: 1px solid var(--risk-caution-line);
+  border-left: 3px solid var(--risk-caution);
+  border-radius: var(--radius);
+  padding: 1rem 1.1rem 0.85rem;
+  margin: 0 0 1rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.nfa-reminder::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 100px;
+  height: 100px;
+  background: radial-gradient(circle at top right, var(--risk-caution-bg), transparent 70%);
+  pointer-events: none;
+}
+
+.nfa-reminder__header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.nfa-reminder__label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--risk-caution);
+  font-weight: 600;
+  background: var(--risk-caution-bg);
+  border: 1px solid var(--risk-caution-line);
+  padding: 0.25rem 0.55rem;
+  border-radius: 2px;
+}
+
+.nfa-reminder__block {
+  margin: 0.85rem 0;
+}
+
+.nfa-reminder__block + .nfa-reminder__block {
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--ink-rule);
+}
+
+.nfa-reminder__block h3 {
+  font-size: 1rem;
+  margin: 0 0 0.4rem;
+  color: var(--cream-0);
+}
+
+.nfa-reminder__block p {
+  margin: 0 0 0.5rem;
+  font-size: 0.92rem;
+  color: var(--cream-1);
+}
+
+.nfa-reminder__block strong {
+  color: var(--risk-caution);
+  font-weight: 600;
+}
+
+.nfa-reminder__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.65rem;
+}
+
+.nfa-reminder__footer {
+  margin: 0.75rem 0 0;
+  padding-top: 0.65rem;
+  border-top: 1px dashed var(--ink-rule);
+  font-style: italic;
+}
+
+
+
+/* =====================================================================
    Mobile
    ===================================================================== */
 

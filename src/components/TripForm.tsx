@@ -7,6 +7,7 @@ import type {
 } from '../types/domain'
 import StopList from './StopList'
 import StateAutocomplete from './StateAutocomplete'
+import NfaReminder from './NfaReminder'
 
 interface Props {
   onSubmit: (trip: TripInput) => void
@@ -165,6 +166,8 @@ export default function TripForm({ onSubmit, initial }: Props) {
           ))}
         </div>
       </fieldset>
+
+      <NfaReminder items={items} />
 
       <fieldset className="fieldset">
         <legend>Transport conditions</legend>

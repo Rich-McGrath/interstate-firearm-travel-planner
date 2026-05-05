@@ -47,7 +47,10 @@ export function generateChecklist(input: ChecklistInput): string[] {
   }
 
   if (trip.transportedItems.includes('nfa_item')) {
-    items.push('Manually review NFA-item interstate transport rules and any state-level restrictions.')
+    items.push(
+      'If transporting a Title II NFA firearm (SBR, SBS, machine gun, or destructive device) across state lines as an individual, submit ATF Form 5320.20 and receive approval before departure.'
+    )
+    items.push('Carry the approved Form 5320.20 during transport.')
   }
 
   // Permit-driven items
