@@ -55,7 +55,16 @@ export default function StateLawPanel({
           const code = stateCode.toUpperCase()
           const profile = getStateProfile(code)
           const reco = reciprocity.find((r) => r.stateCode === code)
-          const stateRestrictions = restrictions.filter((r) => r.stateCode === code)
+          // Sort restrictions within the card by severity descending so
+          // the most consequential warnings (e.g. "Higher apparent risk"
+          // magazine and ammo issues) appear above the milder cautions.
+          // Tie-broken by title for deterministic ordering.
+          const stateRestrictions = restrictions
+            .filter((r) => r.stateCode === code)
+            .sort((a, b) => {
+              const diff = restrictionLevelRank(b.level) - restrictionLevelRank(a.level)
+              return diff !== 0 ? diff : a.title.localeCompare(b.title)
+            })
 
           // Carry-allowed banner — derived from reciprocity status. Even
           // with a recognized permit, "limited" means conditions apply
@@ -230,4 +239,20 @@ function stateSeverityScore(
   }
 
   return Math.max(recoScore, restrictionScore)
+}
+
+// Single-restriction rank used to order the items inside a state card.
+// Mirrors the per-state severity scoring above so the within-card order
+// matches the cross-state order: higher-rank items render earlier.
+function restrictionLevelRank(level: RestrictionResult['level']): number {
+  switch (level) {
+    case 'high':
+      return 4
+    case 'caution':
+      return 3
+    case 'manual_review':
+      return 2
+    case 'low':
+      return 1
+  }
 }
