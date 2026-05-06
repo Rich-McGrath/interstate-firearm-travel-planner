@@ -26,7 +26,14 @@ export interface GeocodeSuggestion {
   stateCode?: string
 }
 
-const ALLOWED_ORIGINS_RE = /^https:\/\/([\w-]+\.)?pages\.dev$|^http:\/\/localhost(:\d+)?$/
+// Allowlist of origins that may call this endpoint cross-origin.
+// Same-origin browser requests don't include an Origin header so they
+// always pass; this list only matters for explicit cross-origin calls
+// (other deployments, dev tooling, scripted clients).
+//   - gunnav.com / www.gunnav.com — production
+//   - *.pages.dev — Cloudflare Pages preview deployments
+//   - localhost / 127.0.0.1 — local dev
+const ALLOWED_ORIGINS_RE = /^https:\/\/(www\.)?gunnav\.com$|^https:\/\/([\w-]+\.)?pages\.dev$|^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/
 
 export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   // Same-origin in production. In dev, allow localhost.
