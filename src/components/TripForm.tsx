@@ -276,7 +276,8 @@ export default function TripForm({ onSubmit, initial }: Props) {
             }
             return (
               <span className="fuel-inputs__hint muted small">
-                Both fields enable fuel-aware route suggestions.
+                Add your vehicle&rsquo;s MPG and tank size to enable
+                fuel-aware route suggestions.
               </span>
             )
           })()}

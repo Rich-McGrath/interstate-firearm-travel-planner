@@ -358,9 +358,9 @@ export default function App() {
           <div className="app__brand">
             <span className="app__brand-mark">§926A</span>
             <div className="app__brand-text">
-              <h1>Interstate Firearm Travel Planner</h1>
+              <h1>The GPS for Gun Law</h1>
               <p className="app__subtitle">
-                Lower-apparent-risk routing under federal § 926A and state-level frameworks.
+                Travel in peace, carry your piece.
               </p>
             </div>
             <div className="app__brand-controls">

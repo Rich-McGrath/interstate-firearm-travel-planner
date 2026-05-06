@@ -2254,11 +2254,63 @@ p { margin: 0 0 0.8em; color: var(--cream-1); }
   letter-spacing: 0.02em;
 }
 
+/* Toolbar row above the map: groups the "How stops are chosen"
+   explainer toggle with the quick "Open in" links so they share a
+   single horizontal band. Wraps gracefully when the row gets tight. */
+.route-map__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  margin: 0.5rem 0;
+}
+
+/* Quick-access "Open in" links. Each is a small ghost-style pill that
+   opens the route in an external nav app in a new tab. Visually a row
+   of small chips so they read as auxiliary, not primary actions. The
+   ExportPanel below the map remains the canonical way to export with
+   selected refueling stops included; these are the fast path. */
+.route-map__export-links {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.route-map__export-label {
+  color: var(--cream-3);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-right: 0.15rem;
+}
+
+.route-map__export-link {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.32rem 0.6rem;
+  background: transparent;
+  border: 1px solid var(--ink-rule-2);
+  color: var(--cream-2);
+  text-decoration: none;
+  font-family: var(--mono);
+  font-size: 0.74rem;
+  letter-spacing: 0.05em;
+  border-radius: 3px;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.route-map__export-link:hover {
+  background: var(--ink-3);
+  color: var(--amber);
+  border-color: var(--amber-line);
+}
+
 /* Collapsible "How stops are chosen" explainer that lives between
    the legend and the map. Closed by default to keep the map header
    compact. */
 .route-map__explainer {
-  margin: 0.5rem 0;
+  margin: 0;
 }
 
 .route-map__explainer-toggle {

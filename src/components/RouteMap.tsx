@@ -311,68 +311,152 @@ export default function RouteMap({
         </span>
       </header>
 
-      {/* Collapsible explainer: how stops are chosen + scored. Closed
-          by default. Helps users understand the logic without cluttering
-          the visible UI for those who don't care to dig in. */}
-      <div className="route-map__explainer">
-        <button
-          type="button"
-          className="route-map__explainer-toggle btn--ghost btn--small"
-          onClick={() => setExplainerOpen((v) => !v)}
-          aria-expanded={explainerOpen}
-        >
-          <span className="mono">ⓘ</span> How stops are chosen{' '}
-          <span aria-hidden="true">{explainerOpen ? '▴' : '▾'}</span>
-        </button>
-        {explainerOpen && (
-          <div className="route-map__explainer-body">
-            <p>
-              Suggested refueling stops are sourced from Mapbox along the route,
-              filtered to gas stations and combination gas/food stops, then ranked
-              by:
-            </p>
-            <ul>
-              <li>
-                <strong>Distance off route</strong> — closer to the route line beats
-                further afield.
-              </li>
-              <li>
-                <strong>Major-brand chain</strong> — recognizable chains
-                (Buc-ee&rsquo;s, Pilot, Love&rsquo;s, Sheetz, etc.) score higher
-                than unbranded options.
-              </li>
-              <li>
-                <strong>Commercial corridor</strong> — POI clusters near major
-                exits get a small bonus.
-              </li>
-              <li>
-                <strong>Category match</strong> — gas + food (one stop, two
-                purposes) outranks gas-only.
-              </li>
-            </ul>
-            <p>
-              <strong>Fuel-aware suggestions</strong> appear when your active
-              vehicle profile has MPG and tank size set:
-            </p>
-            <ul>
-              <li>
-                <strong>⛽ Auto-added</strong> (red border) — a top-off recommended
-                before crossing into a strict state, so you can pass through
-                without stopping there. These are added to your trip
-                automatically; remove them if you prefer.
-              </li>
-              <li>
-                <strong>⛽ Suggested</strong> (cyan border) — a routine fill-up
-                when estimated remaining range falls into the 30-60 mile window.
-                Click <em>Add to trip</em> to accept.
-              </li>
-            </ul>
-            <p className="muted small">
-              Stop ratings, hours, and reviews aren&rsquo;t available from the
-              Mapbox tilequery API — those signals don&rsquo;t feed the score.
-            </p>
-          </div>
-        )}
+      {/* Collapsible explainer + quick "open in" links live in one row.
+          The links open the trip in a third-party nav app in a new tab.
+          Origin and destination are taken from the user's first and last
+          trip stops; intermediate stops are passed as waypoints to
+          Google Maps (the only one of the three that supports them via
+          deep link). Apple and Waze fall back to single-destination. */}
+      <div className="route-map__toolbar">
+        <div className="route-map__explainer">
+          <button
+            type="button"
+            className="route-map__explainer-toggle btn--ghost btn--small"
+            onClick={() => setExplainerOpen((v) => !v)}
+            aria-expanded={explainerOpen}
+          >
+            <span className="mono">ⓘ</span> How stops are chosen{' '}
+            <span aria-hidden="true">{explainerOpen ? '▴' : '▾'}</span>
+          </button>
+          {explainerOpen && (
+            <div className="route-map__explainer-body">
+              <p>
+                Suggested refueling stops are sourced from Mapbox along the route,
+                filtered to gas stations and combination gas/food stops, then ranked
+                by:
+              </p>
+              <ul>
+                <li>
+                  <strong>Distance off route</strong> — closer to the route line beats
+                  further afield.
+                </li>
+                <li>
+                  <strong>Major-brand chain</strong> — recognizable chains
+                  (Buc-ee&rsquo;s, Pilot, Love&rsquo;s, Sheetz, etc.) score higher
+                  than unbranded options.
+                </li>
+                <li>
+                  <strong>Commercial corridor</strong> — POI clusters near major
+                  exits get a small bonus.
+                </li>
+                <li>
+                  <strong>Category match</strong> — gas + food (one stop, two
+                  purposes) outranks gas-only.
+                </li>
+              </ul>
+              <p>
+                <strong>Fuel-aware suggestions</strong> appear when your active
+                vehicle profile has MPG and tank size set:
+              </p>
+              <ul>
+                <li>
+                  <strong>⛽ Auto-added</strong> (red border) — a top-off recommended
+                  before crossing into a strict state, so you can pass through
+                  without stopping there. These are added to your trip
+                  automatically; remove them if you prefer.
+                </li>
+                <li>
+                  <strong>⛽ Suggested</strong> (cyan border) — a routine fill-up
+                  when estimated remaining range falls into the 30-60 mile window.
+                  Click <em>Add to trip</em> to accept.
+                </li>
+              </ul>
+            </div>
+          )}
+        </div>
+
+        {(() => {
+          // Build deep links only when we have a usable origin and
+          // destination. Anything less and the icons are hidden — no
+          // dead controls in the UI.
+          if (stops.length < 2) return null
+          const origin = stops[0]
+          const destination = stops[stops.length - 1]
+          if (!origin?.label || !destination?.label) return null
+          const intermediates = stops.slice(1, -1)
+
+          // Google supports multi-stop waypoints joined by '|'.
+          const gp = new URLSearchParams()
+          gp.set('api', '1')
+          gp.set('origin', origin.label)
+          gp.set('destination', destination.label)
+          if (intermediates.length > 0) {
+            const wp = intermediates
+              .map((s) => s.label)
+              .filter(Boolean)
+              .join('|')
+            if (wp) gp.set('waypoints', wp)
+          }
+          gp.set('travelmode', 'driving')
+          const googleUrl = `https://www.google.com/maps/dir/?${gp.toString()}`
+
+          // Apple — single destination via universal link. Multi-stop
+          // not supported here; user adds stops in-app after opening.
+          const ap = new URLSearchParams()
+          ap.set('saddr', origin.label)
+          ap.set('daddr', destination.label)
+          ap.set('dirflg', 'd')
+          const appleUrl = `https://maps.apple.com/?${ap.toString()}`
+
+          // Waze — single destination, prefer coordinates if we have
+          // them so the deep link is unambiguous, fall back to query.
+          const wp = new URLSearchParams()
+          if (destination.coords) {
+            wp.set('ll', `${destination.coords.lat},${destination.coords.lng}`)
+            wp.set('q', destination.label)
+          } else {
+            wp.set('q', destination.label)
+          }
+          wp.set('navigate', 'yes')
+          const wazeUrl = `https://waze.com/ul?${wp.toString()}`
+
+          return (
+            <div
+              className="route-map__export-links"
+              role="group"
+              aria-label="Open route in another app"
+            >
+              <span className="mono small route-map__export-label">Open in</span>
+              <a
+                href={googleUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="route-map__export-link"
+                title="Open route in Google Maps"
+              >
+                Google
+              </a>
+              <a
+                href={appleUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="route-map__export-link"
+                title="Open route in Apple Maps"
+              >
+                Apple
+              </a>
+              <a
+                href={wazeUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="route-map__export-link"
+                title="Open destination in Waze"
+              >
+                Waze
+              </a>
+            </div>
+          )
+        })()}
       </div>
 
       <div className="route-map" ref={containerRef} />
