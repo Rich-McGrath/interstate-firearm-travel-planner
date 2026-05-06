@@ -61,7 +61,7 @@ export function scoreRouteRisk(input: RouteRiskInput): RouteRiskOutput {
     score += Math.min(10, reciprocityMR * 4)
     manualReviewSignal = true
     reasons.push(
-      `${reciprocityMR} state(s) lack reciprocity data in the seed dataset — manual review required.`
+      `${reciprocityMR} state(s) lack reciprocity data in the current dataset — manual review required.`
     )
   }
 

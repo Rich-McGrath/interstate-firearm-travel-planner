@@ -33,8 +33,8 @@ export default function CarryWarningBanner({ warning }: Props) {
     : `${destName} appears to recognize a ${issuingName} permit only with limitations`
 
   const body = isNo
-    ? `Based on the seed dataset, concealed carry on your reported ${issuingName} permit is likely not authorized at the destination. Verify with the official source below before traveling armed. Other lawful transport frameworks (federal § 926A, locked-container transport, leaving the firearm at a private residence) may still apply — the route below is informational and does not assume a carry posture.`
-    : `Based on the seed dataset, ${destName} recognizes a ${issuingName} permit only under specific conditions (residency rules, narrow exceptions, or a limited reciprocity list). Confirm those conditions with the official source below before relying on your permit at the destination. The per-state panel below shows what the seed entry records; manual review is required.`
+    ? `Concealed carry on your reported ${issuingName} permit is likely not authorized at the destination. Verify with the official source below before traveling armed. Other lawful transport frameworks (federal § 926A, locked-container transport, leaving the firearm at a private residence) may still apply — the route below is informational and does not assume a carry posture.`
+    : `${destName} appears to recognize a ${issuingName} permit only under specific conditions (residency rules, narrow exceptions, or a limited reciprocity list). Confirm those conditions with the official source below before relying on your permit at the destination. The per-state panel below shows the current dataset entry; manual review is required.`
 
   return (
     <aside

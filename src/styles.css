@@ -1624,6 +1624,40 @@ p { margin: 0 0 0.8em; color: var(--cream-1); }
   font-weight: 600;
 }
 
+/* When the state pill is rendered as an <a>, it points at the state's
+   official firearms-licensing page. Visual treatment: same base look
+   as the unlinked pill, but with a subtle hover affordance and a
+   trailing ↗ arrow. The arrow is hidden on the unlinked variant so
+   the two render side-by-side without forcing the layout to reserve
+   space for it. */
+.duty-group__state--link {
+  text-decoration: none;
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+
+.duty-group__state--link:hover,
+.duty-group__state--link:focus-visible {
+  background: var(--ink-2);
+  border-color: var(--amber);
+}
+
+.duty-group__state--link:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+}
+
+.duty-group__state-arrow {
+  font-size: 0.7rem;
+  color: var(--cream-2);
+  margin-left: 0.1rem;
+}
+
+.duty-group__state--link:hover .duty-group__state-arrow,
+.duty-group__state--link:focus-visible .duty-group__state-arrow {
+  color: var(--amber);
+}
+
 /* =====================================================================
    Route switch enhancements (recommended pick + duty counts)
    ===================================================================== */

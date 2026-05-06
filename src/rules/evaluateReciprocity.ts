@@ -33,7 +33,7 @@ export function evaluateReciprocity(input: ReciprocityInput): ReciprocityResult[
       return {
         stateCode: code,
         status: 'manual_review',
-        detail: `${stateName} is not in the seed dataset — manual review required.`,
+        detail: `${stateName} is not covered by the current dataset — manual review required.`,
       }
     }
 
@@ -65,7 +65,7 @@ export function evaluateReciprocity(input: ReciprocityInput): ReciprocityResult[
         break
       case 'manual_review':
       default:
-        detail = `Recognition of a ${issuingState} permit by ${stateName} is not in the seed dataset — manual review required.`
+        detail = `Recognition of a ${issuingState} permit by ${stateName} is not covered by the current dataset — manual review required.`
         break
     }
 

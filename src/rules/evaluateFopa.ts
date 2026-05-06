@@ -85,7 +85,7 @@ export function evaluateFopa(trip: TripInput): FopaAnalysis {
       warnings.push(
         `Lawful-possession status at ${
           !originProfile ? originState : destinationState
-        } is not in the seed dataset — manual review required.`
+        } is not covered by the current dataset — manual review required.`
       )
       if (qualifiesPotentially === true) qualifiesPotentially = 'manual_review'
     }

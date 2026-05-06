@@ -1,4 +1,5 @@
 import { getStateName, getStateProfile } from '../data/states'
+import { officialSourceFor } from '../data/officialSources'
 import {
   dutyClassName,
   formatDutyToInform,
@@ -16,6 +17,10 @@ interface Group {
 
 const ORDER: DutyToInform[] = ['must_inform', 'inform_if_asked', 'manual_review', 'no_duty']
 
+// Per-tier explainer prose. Kept focused on the duty-to-inform
+// concern only — recognition / carry-permit issues are surfaced by
+// the destination carry warning banner and the per-state panel, not
+// here. Conflating them in one paragraph confused users.
 const HELP: Record<DutyToInform, string> = {
   must_inform:
     'Must volunteer carry status to law enforcement when stopped, even if not asked.',
@@ -24,7 +29,7 @@ const HELP: Record<DutyToInform, string> = {
   no_duty:
     'No requirement to volunteer or answer questions about carry status (subject to general legal duties to identify when stopped).',
   manual_review:
-    'Duty unclear from seed dataset, or state recognition issues mean carry rules need separate verification.',
+    'Duty-to-inform rules in these states are not clear-cut — they vary by license type, by stop type, or by recent statutory changes. Verify each state directly using the links below before relying on a default.',
 }
 
 export default function DutySummaryPanel({ routeStates }: Props) {
@@ -60,12 +65,44 @@ export default function DutySummaryPanel({ routeStates }: Props) {
             </div>
             <p className="duty-group__help">{HELP[g.duty]}</p>
             <div className="duty-group__states">
-              {g.states.map((code) => (
-                <span key={code} className="duty-group__state">
-                  <span className="mono">{code.toUpperCase()}</span>{' '}
-                  <span>{getStateName(code.toUpperCase())}</span>
-                </span>
-              ))}
+              {g.states.map((code) => {
+                // Render each state as a link to its official
+                // firearms-licensing page when one exists. The link
+                // is what gives the user something concrete to do
+                // when the duty is uncertain — "manual review" alone
+                // doesn't tell them where to look. For tiers with a
+                // confident classification (must_inform / no_duty)
+                // the link is still useful for double-checking, so
+                // we render it on every state, not just the
+                // manual_review group.
+                const upper = code.toUpperCase()
+                const source = officialSourceFor(upper)
+                const stateName = getStateName(upper)
+                if (!source) {
+                  // No official URL on file — render the badge
+                  // unlinked rather than guessing at one.
+                  return (
+                    <span key={code} className="duty-group__state">
+                      <span className="mono">{upper}</span>{' '}
+                      <span>{stateName}</span>
+                    </span>
+                  )
+                }
+                return (
+                  <a
+                    key={code}
+                    href={source.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="duty-group__state duty-group__state--link"
+                    title={`Verify at ${source.label}`}
+                  >
+                    <span className="mono">{upper}</span>{' '}
+                    <span>{stateName}</span>
+                    <span className="duty-group__state-arrow" aria-hidden="true">↗</span>
+                  </a>
+                )
+              })}
             </div>
           </li>
         ))}

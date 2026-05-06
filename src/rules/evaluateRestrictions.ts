@@ -23,8 +23,8 @@ export function evaluateRestrictions(input: RestrictionsInput): RestrictionResul
       results.push({
         stateCode,
         level: 'manual_review',
-        title: 'State not in seed dataset',
-        detail: `${stateName} is not in the seed dataset — manual review required.`,
+        title: 'State data not available',
+        detail: `${stateName} is not covered by the current dataset — manual review required.`,
       })
       continue
     }
