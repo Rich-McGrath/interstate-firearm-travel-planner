@@ -10,7 +10,8 @@ import type { RouteSampleClient, StopRecommendation, TripStop } from '../types/d
 // which would shift the stops returned by getStopsAlongRoute, which
 // could shift the user's accepted set — a feedback loop. Turn-by-turn
 // is the single surface that reflects the augmented trip; the polyline
-// keeps reflecting the originally-computed route.
+// keeps reflecting the originally-computed route. See 04-design-
+// decisions.md ("turn-by-turn vs polyline mismatch is intentional").
 
 // Mapbox Directions caps coordinates per request at 25. We surface
 // this so the caller can decide whether to refetch (under the cap)
