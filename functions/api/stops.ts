@@ -49,8 +49,37 @@ const ALLOWED_ORIGINS_RE = /^https:\/\/([\w-]+\.)?pages\.dev$|^http:\/\/localhos
 
 const RADIUS_METERS = 2500 // ~1.55 mi off route
 const PER_QUERY_LIMIT = 25
-const MAX_RESULTS = 30
-const MAX_SAMPLES = 12
+
+// Sampling and result density both scale with route length so a
+// cross-country trip has a rich enough pool for the fuel-aware planner
+// to land suggestions inside its target windows (30 mi for low-fuel,
+// 30-80 mi pre-strict-state-border). The original fixed caps (12
+// samples / 30 results) were sized for shorter trips and starved the
+// planner of candidates on long routes — a 3000-mile trip with one
+// query every 258 miles has huge dead zones where no stations are
+// even scanned.
+//
+// Budget: query samples are direct Cloudflare subrequests, so we cap
+// at 40 to stay well under the 50-subrequest-per-request free-plan
+// ceiling (directions.ts uses one). Results scale higher because they
+// don't cost subrequests; 150 is plenty for cluster-on-map plus a
+// scrollable sidebar.
+const MIN_QUERY_SAMPLES = 12
+const MAX_QUERY_SAMPLES = 40
+const MIN_RESULTS = 30
+const MAX_RESULTS = 150
+
+// We use the input sample count as a route-length proxy. /api/directions
+// supplies roughly one sample per 50 miles, floored at 12, capped at 80.
+// Roughly half that for query density (one Tilequery per ~100 mi) and
+// a couple multiples for results gives sensible curves at both ends.
+function scaleQuerySamples(inputCount: number): number {
+  return Math.max(MIN_QUERY_SAMPLES, Math.min(MAX_QUERY_SAMPLES, Math.round(inputCount * 0.55)))
+}
+
+function scaleResultCap(inputCount: number): number {
+  return Math.max(MIN_RESULTS, Math.min(MAX_RESULTS, inputCount * 2))
+}
 
 // Lower-cased substrings used to detect chain brands in POI names. Match
 // happens via simple includes() against the full POI name. Conservative
@@ -86,10 +115,12 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     return json({ error: 'server misconfigured' }, 500)
   }
 
-  // Limit how many samples we hit so we stay well under Mapbox limits even
-  // on very long routes.
-  const querySamples = samples.length > MAX_SAMPLES
-    ? evenSubset(samples, MAX_SAMPLES)
+  // Scale query samples with input route length so long trips actually
+  // get coverage. evenSubset picks evenly-spaced points along the route
+  // up to the target count.
+  const targetSamples = scaleQuerySamples(samples.length)
+  const querySamples = samples.length > targetSamples
+    ? evenSubset(samples, targetSamples)
     : samples
 
   // Parallel-fetch Tilequery at each sample point.
@@ -115,10 +146,11 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   }
 
   // Sort by distance off route ascending; the client will rescore with its
-  // own weighting.
+  // own weighting. Result cap scales with route length so long trips have
+  // a richer pool for fuel-aware planning.
   const stops = Array.from(seen.values())
     .sort((a, b) => a.distanceOffRouteMiles - b.distanceOffRouteMiles)
-    .slice(0, MAX_RESULTS)
+    .slice(0, scaleResultCap(samples.length))
 
   return json({ stops })
 }
