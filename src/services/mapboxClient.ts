@@ -15,12 +15,30 @@ export interface RouteSample {
   stateCode?: string
 }
 
+// Per-step record returned from /api/directions. Distances are already
+// in miles (server-side conversion).
+export interface DirectionsStep {
+  instruction: string
+  roadName: string
+  distanceMiles: number
+}
+
+// One leg per waypoint pair. For an N-stop trip the response carries
+// N-1 legs.
+export interface DirectionsLeg {
+  summary: string
+  distanceMiles: number
+  durationMinutes: number
+  steps: DirectionsStep[]
+}
+
 export interface DirectionsRoute {
   distanceMiles: number
   durationMinutes: number
   statesCrossed: string[]
   geometry: string
   samples: RouteSample[]
+  legs: DirectionsLeg[]
 }
 
 export async function geocode(query: string, signal?: AbortSignal): Promise<GeocodeSuggestion[]> {
