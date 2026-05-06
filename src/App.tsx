@@ -356,7 +356,13 @@ export default function App() {
       <div className="app">
         <header className="app__header">
           <div className="app__brand">
-            <span className="app__brand-mark">§926A</span>
+            <img
+              src="/gunnav-logo.png"
+              alt="GunNav"
+              className="app__brand-mark"
+              width="64"
+              height="64"
+            />
             <div className="app__brand-text">
               <h1>The GPS for Gun Law</h1>
               <p className="app__subtitle">

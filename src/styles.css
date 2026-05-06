@@ -157,20 +157,19 @@ p { margin: 0 0 0.8em; color: var(--cream-1); }
   gap: 1.5rem;
 }
 
+/* Brand mark — the GunNav logo image. Transparent PNG so it sits
+   directly on the header background; sized to read clearly next to
+   the title without dominating it. The previous §926A amber pill
+   styling is gone — the logo carries the brand now. */
 .app__brand-mark {
-  font-family: var(--mono);
-  font-weight: 600;
-  font-size: 0.95rem;
-  background: var(--amber);
-  color: var(--ink-0);
-  padding: 0.6rem 0.75rem;
-  border-radius: 2px;
-  letter-spacing: 0.04em;
-  display: inline-flex;
-  align-items: center;
+  width: 64px;
+  height: 64px;
+  flex-shrink: 0;
   align-self: flex-start;
-  position: relative;
-  box-shadow: 0 0 0 4px rgba(224, 168, 46, 0.15);
+  display: block;
+  /* No background, padding, or border — the PNG already has its own
+     visual weight. Add a subtle drop shadow only if needed for
+     contrast on busier backgrounds; current dark ink doesn't need it. */
 }
 
 .app__brand h1 {
