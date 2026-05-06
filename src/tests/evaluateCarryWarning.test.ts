@@ -56,6 +56,7 @@ describe('evaluateCarryWarning', () => {
     expect(result).not.toBeNull()
     expect(result?.destinationStateCode).toBe('NY')
     expect(result?.issuingStateCode).toBe('TX')
+    expect(result?.tier).toBe('no')
   })
 
   it('does not fire when destination recognition is "yes"', () => {
@@ -67,15 +68,20 @@ describe('evaluateCarryWarning', () => {
     expect(result).toBeNull()
   })
 
-  it('does not fire on "limited" recognition (intentional design choice)', () => {
-    // 'limited' goes to the per-state panel below; conflating it with
-    // 'no' would flatten an important distinction in the data.
+  it('fires on "limited" recognition with tier carried through', () => {
+    // The seed dataset's policy classifier maps "restrictive carrying
+    // state + broad issuing state" (e.g. CA recognizing TX) to
+    // 'limited' rather than 'no'. That is the canonical "your permit
+    // isn't honored here" case in real-world reciprocity, so the
+    // banner must fire here too. Tier carries through to the
+    // component so the copy can soften slightly versus a hard 'no'.
     const result = evaluateCarryWarning({
       trip: trip(),
       reciprocity: reciprocity('limited'),
       destinationStateCode: 'NY',
     })
-    expect(result).toBeNull()
+    expect(result).not.toBeNull()
+    expect(result?.tier).toBe('limited')
   })
 
   it('does not fire on "manual_review" recognition', () => {
@@ -173,5 +179,29 @@ describe('evaluateCarryWarning', () => {
       destinationStateCode: 'NY',
     })
     expect(result).toBeNull()
+  })
+
+  it('regression: TX permit \u2192 CA destination fires (limited tier)', () => {
+    // The seed dataset returns 'limited' (not 'no') for restrictive-
+    // state-recognizing-broad-state pairs. Before the rule was
+    // expanded to fire on 'limited', this exact scenario \u2014 a
+    // Texas permit holder driving to California \u2014 silently
+    // suppressed the banner. This test pins the fix.
+    const result = evaluateCarryWarning({
+      trip: trip({ permitState: 'TX' }),
+      reciprocity: [
+        { stateCode: 'TX', status: 'yes', detail: 'Issuing state.' },
+        {
+          stateCode: 'CA',
+          status: 'limited',
+          detail: 'CA recognizes a TX permit with limitations.',
+        },
+      ],
+      destinationStateCode: 'CA',
+    })
+    expect(result).not.toBeNull()
+    expect(result?.tier).toBe('limited')
+    expect(result?.destinationStateCode).toBe('CA')
+    expect(result?.issuingStateCode).toBe('TX')
   })
 })
