@@ -108,7 +108,20 @@ export default function DirectionsPanel({
             break
           }
         }
-        if (legIdx === -1) continue
+        // Fallback — if the planner's mile mark fell outside every
+        // leg's range (Mapbox leg distances and planFuelStops's
+        // haversine-on-samples distances are on slightly different
+        // scales and can drift by 1-3 mi over a long trip), assign
+        // to whichever leg is closest by distance to either bound.
+        // Without this fallback the insertion silently disappears
+        // from Turn-by-Turn even though it's correct on the map.
+        if (legIdx === -1) {
+          if (ins.milesFromOrigin < (base[0] ?? 0)) {
+            legIdx = 0
+          } else {
+            legIdx = legs.length - 1
+          }
+        }
         grouped[legIdx]!.push(ins)
       }
       for (const arr of grouped) {

@@ -262,7 +262,7 @@ export default function RouteMap({
   if (!PUBLIC_TOKEN) {
     return (
       <section className="card">
-        <header className="card__header"><h2>Route Map</h2></header>
+        <header className="card__header"><h2>Map Route</h2></header>
         <p className="warning-list-inline">
           Map unavailable: <code>VITE_MAPBOX_PUBLIC_TOKEN</code> is not set in the build
           environment. Add it in Cloudflare Pages → Settings → Variables and Secrets,
@@ -275,7 +275,7 @@ export default function RouteMap({
   return (
     <section className="card route-map-card">
       <header className="card__header">
-        <h2>Route Map</h2>
+        <h2>Map Route</h2>
         <span className="route-map-legend">
           <span className="route-map-legend__item"><i style={{ background: RISK_COLORS.low }} />Lower</span>
           <span className="route-map-legend__item"><i style={{ background: RISK_COLORS.caution }} />Caution</span>

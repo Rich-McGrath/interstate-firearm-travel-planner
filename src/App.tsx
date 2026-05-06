@@ -395,18 +395,9 @@ export default function App() {
 
           {evaluation && trip && exportPayload && (
             <>
-              {/* Combined Route + FOPA analysis */}
-              <RouteAndFopaPanel
-                routes={routes}
-                selectedId={evaluation.route.id}
-                onSelect={setSelectedRouteId}
-                computedRiskLevel={evaluation.risk.level}
-                computedRiskScore={evaluation.risk.score}
-                computedRiskReasons={evaluation.risk.reasons}
-                fopa={evaluation.fopa}
-              />
-
-              {/* Route & Refueling Stops (map + sidebar tabs) */}
+              {/* Route & Refueling Stops (map + sidebar tabs) — moved
+                  above the Route + FOPA analysis so the visual map
+                  context lands before the analytical breakdown. */}
               <StopsSection
                 route={evaluation.route}
                 tripStops={trip.stops}
@@ -425,6 +416,17 @@ export default function App() {
                 legs={evaluation.route.legs}
                 legLabels={legLabels}
                 fuelInsertions={fuelInsertionsForDirections}
+              />
+
+              {/* Combined Route + FOPA analysis */}
+              <RouteAndFopaPanel
+                routes={routes}
+                selectedId={evaluation.route.id}
+                onSelect={setSelectedRouteId}
+                computedRiskLevel={evaluation.risk.level}
+                computedRiskScore={evaluation.risk.score}
+                computedRiskReasons={evaluation.risk.reasons}
+                fopa={evaluation.fopa}
               />
 
               {/* Duty to inform by state */}
