@@ -15,6 +15,11 @@ import { scoreRouteRisk } from './rules/scoreRouteRisk'
 import { enrichStopsWithStateContext } from './rules/enrichStops'
 import { planFuelStops } from './rules/planFuelStops'
 import { scoreStops } from './rules/scoreStops'
+import {
+  buildEffectiveStops,
+  effectiveStopsEqual,
+  type EffectiveStopPoint,
+} from './rules/buildEffectiveStops'
 import { generateChecklist } from './utils/checklist'
 import {
   getDirections,
@@ -36,6 +41,7 @@ import { TrustModeContext } from './services/trustMode'
 import {
   tripDestination,
   tripOrigin,
+  type DirectionsLeg,
   type RouteOption,
   type StopFilters,
   type StopRecommendation,
@@ -342,6 +348,98 @@ export default function App() {
 
   const selectedSuggestedStops = enrichedStops.filter((s) => selectedStopIds.includes(s.id))
 
+  // Effective directions: when the user has accepted suggested or
+  // fuel-aware stops, we re-fetch turn-by-turn through the augmented
+  // stop list so the directions panel actually walks through every
+  // stop the driver added. The map polyline keeps the originally-
+  // computed route on purpose (re-routing it would shift the samples
+  // used by getStopsAlongRoute and could feedback-loop into different
+  // stop suggestions). This is exactly the kind of cosmetic mismatch
+  // we accept in 04-design-decisions.md — turn-by-turn is the single
+  // surface that reflects the augmented trip.
+  const [effectiveLegs, setEffectiveLegs] = useState<DirectionsLeg[] | null>(
+    null
+  )
+  const [effectiveLegLabels, setEffectiveLegLabels] = useState<string[] | null>(
+    null
+  )
+  const lastEffectiveRequestRef = useRef<EffectiveStopPoint[] | null>(null)
+
+  // Re-fetch directions when the effective stop list (trip stops +
+  // selected suggestions) differs from the trip-stops-only sequence
+  // already baked into `routes`. We only mutate legs/labels — the
+  // selected route's polyline, samples, and statesCrossed stay
+  // anchored to the original trip-only fetch.
+  useEffect(() => {
+    if (!trip || !evaluation?.route) {
+      setEffectiveLegs(null)
+      setEffectiveLegLabels(null)
+      lastEffectiveRequestRef.current = null
+      return
+    }
+    const effective = buildEffectiveStops({
+      tripStops: trip.stops,
+      selectedSuggested: selectedSuggestedStops,
+      samples: evaluation.route.samples,
+    })
+    // Null means either too few stops to route at all, or the
+    // augmented list exceeded Mapbox's 25-stop cap. In either case
+    // fall back to the original legs.
+    if (!effective) {
+      setEffectiveLegs(null)
+      setEffectiveLegLabels(null)
+      lastEffectiveRequestRef.current = null
+      return
+    }
+    // No suggested stops were added — the effective list IS the
+    // trip stops, which is what `routes` already used. Skip the
+    // refetch and let the original legs render.
+    const tripOnly =
+      selectedSuggestedStops.length === 0 ||
+      effective.length === trip.stops.filter((s) => s.coords).length
+    if (tripOnly) {
+      setEffectiveLegs(null)
+      setEffectiveLegLabels(null)
+      lastEffectiveRequestRef.current = null
+      return
+    }
+    // Skip if we already fetched this exact sequence (e.g. user
+    // toggled a different filter that didn't change selection).
+    const last = lastEffectiveRequestRef.current
+    if (last && effectiveStopsEqual(last, effective)) return
+    lastEffectiveRequestRef.current = effective
+
+    let cancelled = false
+    getDirections(effective.map((p) => ({ lat: p.lat, lng: p.lng })))
+      .then((rs) => {
+        if (cancelled) return
+        const first = rs[0]
+        if (!first) return
+        setEffectiveLegs(first.legs ?? [])
+        // Build labels end-to-end across the augmented stop list so a
+        // user sees "San Antonio → Buc-ee's → Lebanon" rather than the
+        // original "San Antonio → Lebanon" with a fuel banner glued in.
+        const labels: string[] = []
+        for (let i = 0; i < effective.length - 1; i++) {
+          const from = effective[i]?.label?.trim() || `Stop ${i}`
+          const to = effective[i + 1]?.label?.trim() || `Stop ${i + 1}`
+          labels.push(`${from} → ${to}`)
+        }
+        setEffectiveLegLabels(labels)
+      })
+      .catch(() => {
+        if (cancelled) return
+        // Refetch failure isn't fatal — we just keep the original
+        // legs. Don't surface a new error UI for what's effectively a
+        // background enhancement.
+        setEffectiveLegs(null)
+        setEffectiveLegLabels(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [trip, evaluation?.route, selectedSuggestedStops])
+
   const exportPayload = (() => {
     if (!trip) return null
     const origin = tripOrigin(trip)
@@ -413,8 +511,8 @@ export default function App() {
                 onToggleSelect={toggleStop}
                 onHoverStop={setHoveredStopId}
                 fuelSuggestionMeta={fuelSuggestionMeta}
-                legs={evaluation.route.legs}
-                legLabels={legLabels}
+                legs={effectiveLegs ?? evaluation.route.legs}
+                legLabels={effectiveLegLabels ?? legLabels}
                 fuelInsertions={fuelInsertionsForDirections}
               />
 

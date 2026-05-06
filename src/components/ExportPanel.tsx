@@ -1,10 +1,6 @@
 import { useState } from 'react'
 import type { StopRecommendation, TripInput, TripStop } from '../types/domain'
-import {
-  buildAppleMapsUrl,
-  buildGoogleMapsUrl,
-  buildWazeUrl,
-} from '../services/exportMaps'
+import { buildAllExportUrls } from '../services/exportMaps'
 import { buildShareUrl } from '../services/share'
 
 interface Props {
@@ -45,13 +41,15 @@ export default function ExportPanel({
   const allWaypoints = [...userWaypoints.map(userAsStop), ...suggestedStops]
   const hasIntermediateStops = allWaypoints.length > 0
 
-  const target = { origin, destination, waypoints: allWaypoints }
-  const googleUrl = buildGoogleMapsUrl(target)
-  const appleUrl = buildAppleMapsUrl(target)
-  // Waze URL scheme can't carry waypoints, so we only expose the button
-  // when there are no intermediate stops — otherwise it would silently
-  // produce a misleading partial route.
-  const wazeUrl = hasIntermediateStops ? null : buildWazeUrl(target)
+  // Single source of truth for which export buttons are valid for
+  // this target. Waze is null when intermediate stops exist (its
+  // URL scheme can't carry waypoints, so a single-destination link
+  // would silently produce a misleading partial route).
+  const { google: googleUrl, apple: appleUrl, waze: wazeUrl } = buildAllExportUrls({
+    origin,
+    destination,
+    waypoints: allWaypoints,
+  })
 
   async function handleCopyShareLink() {
     const url = buildShareUrl(trip)

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
+  buildAllExportUrls,
   buildAppleMapsUrl,
   buildGoogleMapsUrl,
   buildWazeUrl,
@@ -142,5 +143,47 @@ describe('buildWazeUrl', () => {
     expect(url).toContain('q=New+York%2C+NY')
     expect(url).not.toContain('Skipped')
     expect(url).not.toContain('41.5')
+  })
+})
+
+describe('buildAllExportUrls', () => {
+  it('returns google + apple + waze URLs when no waypoints are present', () => {
+    const set = buildAllExportUrls(target())
+    expect(set.google).toContain('origin=Boston%2C+MA')
+    expect(set.apple).toContain('saddr=Boston%2C+MA')
+    expect(set.waze).not.toBeNull()
+    expect(set.waze).toContain('q=New+York%2C+NY')
+  })
+
+  it('hides Waze (returns null) when intermediate stops exist', () => {
+    // Single source of truth for the Waze hide rule. Both the Export
+    // panel and the Map Route toolbar consume this — neither
+    // re-implements the check.
+    const set = buildAllExportUrls(
+      target([stop({ id: 'a', address: 'Hartford, CT' })])
+    )
+    expect(set.waze).toBeNull()
+  })
+
+  it('keeps Google and Apple URLs valid when Waze is hidden', () => {
+    const set = buildAllExportUrls(
+      target([
+        stop({ id: 'a', lat: 41.5, lng: -72.7 }),
+        stop({ id: 'b', lat: 40.9, lng: -73.5 }),
+      ])
+    )
+    // Google chains via |, Apple chains via +to: — both should
+    // include both waypoints regardless of Waze's state.
+    expect(set.google).toMatch(/waypoints=41\.5%2C-72\.7%7C40\.9%2C-73\.5/)
+    expect(set.apple).toMatch(
+      /daddr=41\.5%2C-72\.7\+to:40\.9%2C-73\.5\+to:New\+York%2C\+NY/
+    )
+  })
+
+  it('treats an empty waypoints array the same as no waypoints', () => {
+    // Edge case: a caller passing waypoints: [] (vs undefined) must
+    // not accidentally hide Waze.
+    const set = buildAllExportUrls(target([]))
+    expect(set.waze).not.toBeNull()
   })
 })
