@@ -28,7 +28,8 @@ export default function ExportPanel({
 
   // Combine user-planned waypoints with selected suggested refueling stops
   // for the map exports. User stops come first; suggested stops are
-  // appended in the order selected.
+  // appended in the order selected. Coords (when present) flow through
+  // to the URL builders, which prefer "lat,lng" over the label string.
   const userAsStop = (s: TripStop): StopRecommendation => ({
     id: s.id,
     name: s.label,
@@ -42,11 +43,15 @@ export default function ExportPanel({
     reasons: [],
   })
   const allWaypoints = [...userWaypoints.map(userAsStop), ...suggestedStops]
+  const hasIntermediateStops = allWaypoints.length > 0
 
   const target = { origin, destination, waypoints: allWaypoints }
   const googleUrl = buildGoogleMapsUrl(target)
   const appleUrl = buildAppleMapsUrl(target)
-  const wazeUrl = buildWazeUrl(target, allWaypoints[0])
+  // Waze URL scheme can't carry waypoints, so we only expose the button
+  // when there are no intermediate stops — otherwise it would silently
+  // produce a misleading partial route.
+  const wazeUrl = hasIntermediateStops ? null : buildWazeUrl(target)
 
   async function handleCopyShareLink() {
     const url = buildShareUrl(trip)
@@ -66,7 +71,7 @@ export default function ExportPanel({
     <section className="card">
       <header className="card__header">
         <h2>Export &amp; Checklist</h2>
-        {allWaypoints.length > 0 && (
+        {hasIntermediateStops && (
           <span className="muted mono small">
             {userWaypoints.length} Planned · {suggestedStops.length} Suggested
           </span>
@@ -80,9 +85,11 @@ export default function ExportPanel({
         <a className="btn btn--export" href={appleUrl} target="_blank" rel="noreferrer">
           Open in Apple Maps
         </a>
-        <a className="btn btn--export" href={wazeUrl} target="_blank" rel="noreferrer">
-          Open in Waze
-        </a>
+        {wazeUrl && (
+          <a className="btn btn--export" href={wazeUrl} target="_blank" rel="noreferrer">
+            Open in Waze
+          </a>
+        )}
         <button
           type="button"
           className="btn btn--ghost"
@@ -94,12 +101,12 @@ export default function ExportPanel({
       </div>
 
       <p className="muted small">
-        Note: Google Maps supports multi-stop waypoints. Apple Maps does not formally
-        support multi-stop directions via URL — add stops in-app after opening. Waze
-        URLs target a single destination only and will navigate to the first
-        intermediate stop, or to the final destination if none. The share link encodes
-        the trip into the URL hash and contains no personal information beyond what
-        you entered.
+        Note: Google Maps and Apple Maps both carry your intermediate stops into
+        the route. Waze&rsquo;s URL scheme only supports a single destination, so
+        the Waze button is hidden when your trip has stops — open Waze and add
+        them manually if you prefer Waze. The share link encodes the trip into
+        the URL hash and contains no personal information beyond what you
+        entered.
       </p>
 
       <div className="card__section">
