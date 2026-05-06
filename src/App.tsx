@@ -21,6 +21,7 @@ import {
   effectiveStopsEqual,
   type EffectiveStopPoint,
 } from './rules/buildEffectiveStops'
+import { evaluateCarryWarning } from './rules/evaluateCarryWarning'
 import { generateChecklist } from './utils/checklist'
 import {
   getDirections,
@@ -440,6 +441,24 @@ export default function App() {
       cancelled = true
     }
   }, [trip, evaluation?.route, selectedSuggestedStops])
+
+  // Carry warning: fires when the destination state's recognition of
+  // the user's reported permit is 'no' AND they're transporting a
+  // firearm. Pinned at the top of results so it can't be missed. The
+  // route still generates — this is an informational tool, not a
+  // gatekeeper, and other lawful transport frameworks (federal § 926A,
+  // locked-container transport, leaving the firearm at the destination)
+  // may still apply. See evaluateCarryWarning.ts for the firing rules.
+  const carryWarning = useMemo(() => {
+    if (!trip || !evaluation) return null
+    const states = evaluation.route.statesCrossed
+    const destinationStateCode = states[states.length - 1]
+    return evaluateCarryWarning({
+      trip,
+      reciprocity: evaluation.reciprocity,
+      destinationStateCode,
+    })
+  }, [trip, evaluation])
 
   const exportPayload = (() => {
     if (!trip) return null
