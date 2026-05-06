@@ -103,6 +103,23 @@ export interface RouteSampleClient {
   stateCode?: string
 }
 
+// Per-step record for the Turn-by-Turn Directions panel. Distances
+// are pre-converted to miles upstream — no units conversion in the UI.
+export interface DirectionsStep {
+  instruction: string
+  roadName: string
+  distanceMiles: number
+}
+
+// One leg per waypoint pair on the trip. An N-stop trip has N-1 legs.
+// Steps inside a leg are ordered origin-to-destination of that leg.
+export interface DirectionsLeg {
+  summary: string
+  distanceMiles: number
+  durationMinutes: number
+  steps: DirectionsStep[]
+}
+
 export interface RouteOption {
   id: string
   name: string
@@ -115,6 +132,11 @@ export interface RouteOption {
   riskLevel: RiskLevel
   riskReasons: string[]
   samples: RouteSampleClient[]
+  // Per-leg turn-by-turn directions, sourced from Mapbox via
+  // /api/directions. Empty array if the Mapbox response didn't include
+  // legs (older cached responses) — the DirectionsPanel renders nothing
+  // in that case.
+  legs: DirectionsLeg[]
 }
 
 export interface AmmunitionRestriction {
