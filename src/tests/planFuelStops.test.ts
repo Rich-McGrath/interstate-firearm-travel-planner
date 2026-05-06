@@ -29,6 +29,8 @@ function buildSyntheticRoute(samples: RouteSampleClient[]): RouteOption {
     riskLevel: 'manual_review',
     riskReasons: [],
     samples,
+    // planFuelStops doesn't read legs; empty array satisfies the type.
+    legs: [],
   }
 }
 

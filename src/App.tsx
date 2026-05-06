@@ -5,6 +5,7 @@ import RouteAndFopaPanel from './components/RouteAndFopaPanel'
 import StateLawPanel from './components/StateLawPanel'
 import DutySummaryPanel from './components/DutySummaryPanel'
 import StopsSection from './components/StopsSection'
+import DirectionsPanel from './components/DirectionsPanel'
 import ExportPanel from './components/ExportPanel'
 import RecentTripsMenu from './components/RecentTripsMenu'
 import TrustModeToggle from './components/TrustModeToggle'
@@ -58,6 +59,10 @@ function toRouteOption(r: DirectionsRoute, idx: number): RouteOption {
     riskLevel: 'manual_review',
     riskReasons: [],
     samples: r.samples,
+    // Defensive default: older cached responses or geocode-only paths
+    // may not carry legs. Empty array is the right empty-state input
+    // for DirectionsPanel.
+    legs: r.legs ?? [],
   }
 }
 
@@ -216,6 +221,21 @@ export default function App() {
     return { route, fopa, reciprocity, restrictions, risk, checklist }
   }, [trip, routes, selectedRouteId])
 
+  // Leg labels for the directions panel — one per leg (= stops.length-1).
+  // Pairs each leg with the trip stop names it spans, so the user sees
+  // "Vancouver → Seattle" rather than "Leg 1." Falls back to "Leg N"
+  // when stop labels aren't available.
+  const legLabels = useMemo(() => {
+    if (!trip || trip.stops.length < 2) return []
+    const labels: string[] = []
+    for (let i = 0; i < trip.stops.length - 1; i++) {
+      const from = trip.stops[i]?.label?.trim() || `Stop ${i}`
+      const to = trip.stops[i + 1]?.label?.trim() || `Stop ${i + 1}`
+      labels.push(`${from} → ${to}`)
+    }
+    return labels
+  }, [trip])
+
   // Enrich stops with state context (which state they're in, that
   // state's duty-to-inform, restrictive flag) using the selected route's
   // sample points. Pure derived data; cheap recompute.
@@ -372,6 +392,12 @@ export default function App() {
                 onToggleSelect={toggleStop}
                 onHoverStop={setHoveredStopId}
                 fuelSuggestionMeta={fuelSuggestionMeta}
+              />
+
+              {/* Turn-by-turn directions, per leg, collapsible */}
+              <DirectionsPanel
+                legs={evaluation.route.legs}
+                legLabels={legLabels}
               />
 
               {/* Duty to inform by state */}
