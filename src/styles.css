@@ -2201,6 +2201,27 @@ p { margin: 0 0 0.8em; color: var(--cream-1); }
   opacity: 0.75;
 }
 
+/* Fuel-stop legend swatches — small open rings matching the on-map
+   stroke colors. Distinct from the regular "Stops" swatch (also an
+   open ring, amber) by color: red for strict-state top-off, cyan for
+   low-fuel. Only render when fuel suggestions are present in the
+   current trip. */
+.route-map-legend__item--fuel-strict i.route-map-legend__fuel-strict {
+  background: transparent;
+  border: 2px solid #d44545;
+  border-radius: 50%;
+  width: 0.7rem;
+  height: 0.7rem;
+}
+
+.route-map-legend__item--fuel-low i.route-map-legend__fuel-low {
+  background: transparent;
+  border: 2px solid #5cb8d4;
+  border-radius: 50%;
+  width: 0.7rem;
+  height: 0.7rem;
+}
+
 /* Hint line under the map */
 .route-map__hint {
   margin: 0.5rem 0 0;
@@ -2401,6 +2422,154 @@ p { margin: 0 0 0.8em; color: var(--cream-1); }
   }
 }
 
+/* =====================================================================
+   Turn-by-Turn Directions panel
+   ===================================================================== */
+
+.directions-panel__intro {
+  margin: 0 0 0.85rem;
+}
+
+.directions-panel__controls {
+  display: flex;
+  gap: 0.4rem;
+  margin-bottom: 0.85rem;
+}
+
+.directions-panel__legs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.directions-panel__leg {
+  background: var(--ink-2);
+  border: 1px solid var(--ink-rule);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.directions-panel__leg-header {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  align-items: center;
+  gap: 0.7rem;
+  width: 100%;
+  padding: 0.7rem 0.85rem;
+  background: transparent;
+  border: none;
+  color: var(--cream-1);
+  font-family: var(--serif-body);
+  font-size: 0.95rem;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.directions-panel__leg-header:hover {
+  background: var(--ink-3);
+}
+
+.directions-panel__leg-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  background: var(--amber-soft);
+  color: var(--amber);
+  border-radius: 50%;
+  font-size: 0.78rem;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.directions-panel__leg-label {
+  font-weight: 500;
+  color: var(--cream-0);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.directions-panel__leg-meta {
+  font-size: 0.78rem;
+  color: var(--cream-2);
+  letter-spacing: 0.04em;
+}
+
+.directions-panel__leg-chevron {
+  color: var(--cream-3);
+  font-size: 0.85rem;
+}
+
+.directions-panel__leg-body {
+  padding: 0.4rem 0.85rem 0.85rem 3.05rem;
+  border-top: 1px dashed var(--ink-rule);
+}
+
+.directions-panel__leg-summary {
+  margin: 0.4rem 0 0.6rem;
+  font-style: italic;
+}
+
+.directions-panel__steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.directions-panel__step {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.6rem;
+  align-items: start;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid var(--ink-rule);
+}
+
+.directions-panel__step:last-child {
+  border-bottom: none;
+}
+
+.directions-panel__step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.4rem;
+  height: 1.4rem;
+  font-size: 0.72rem;
+  color: var(--cream-3);
+  background: var(--ink-3);
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 0.05rem;
+}
+
+.directions-panel__step-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.directions-panel__step-instruction {
+  color: var(--cream-1);
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.directions-panel__step-meta {
+  font-size: 0.74rem;
+  color: var(--cream-3);
+  letter-spacing: 0.03em;
+}
+
 @media (max-width: 540px) {
   .app__header { padding: 1.25rem 1rem; }
   .app__brand { flex-direction: column; align-items: flex-start; gap: 0.7rem; }
@@ -2410,4 +2579,17 @@ p { margin: 0 0 0.8em; color: var(--cream-1); }
   .recent-trips__menu { right: auto; left: 0; }
   .stops-section__filters { padding: 0.55rem; }
   .stops-section__sidebar { max-height: 360px; padding: 0.6rem; }
+  /* Directions panel — stack header bits for narrow screens */
+  .directions-panel__leg-header {
+    grid-template-columns: auto 1fr auto;
+    grid-template-rows: auto auto;
+    gap: 0.4rem 0.6rem;
+  }
+  .directions-panel__leg-meta {
+    grid-column: 2 / span 2;
+    grid-row: 2;
+  }
+  .directions-panel__leg-body {
+    padding-left: 1rem;
+  }
 }

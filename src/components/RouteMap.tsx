@@ -25,6 +25,14 @@ interface Props {
   hoveredStopId: string | null
   onToggleStop: (id: string) => void
   onHoverStop: (id: string | null) => void
+  // Fuel-aware suggestion metadata. Stops keyed in this map render
+  // on a separate non-clustered layer with a kind-specific stroke
+  // color (red for strict-state top-offs, cyan for low-fuel). Optional
+  // — undefined or empty Map means no fuel-aware visualization fires.
+  fuelSuggestionMeta?: Map<
+    string,
+    { kind: 'low_fuel' | 'strict_state_topoff'; reason: string }
+  >
 }
 
 const PUBLIC_TOKEN = (import.meta.env['VITE_MAPBOX_PUBLIC_TOKEN'] as string | undefined) ?? ''
@@ -58,6 +66,19 @@ const LYR_STOPS_CLUSTERS = 'suggested-stops-clusters'
 const LYR_STOPS_CLUSTER_COUNT = 'suggested-stops-cluster-count'
 const LYR_STOPS_POINTS = 'suggested-stops-points'
 
+// Fuel-suggested stops live on their own source/layer that does NOT
+// cluster. Auto-added strict-state top-offs are urgent enough that
+// burying them in a +N badge defeats the purpose; same logic applies
+// to low-fuel suggestions, just at lower urgency. Both kinds share a
+// single layer with a paint expression keyed off `fuelKind`.
+const SRC_FUEL_STOPS = 'fuel-stops-src'
+const LYR_FUEL_STOPS_POINTS = 'fuel-stops-points'
+
+// Fuel-stop stroke colors — match the sidebar stop-card accent colors
+// in styles.css so the user can map between the two views by color.
+const FUEL_STRICT_STROKE = '#d44545' // strict_state_topoff (red)
+const FUEL_LOW_STROKE = '#5cb8d4' // low_fuel (cyan)
+
 // State-overlay layer + source IDs. We back these with a GeoJSON
 // FeatureCollection of US state polygons (loaded from the public
 // `us-atlas` TopoJSON, converted client-side once on first render).
@@ -83,6 +104,7 @@ export default function RouteMap({
   hoveredStopId,
   onToggleStop,
   onHoverStop,
+  fuelSuggestionMeta,
 }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<mapboxgl.Map | null>(null)
@@ -149,8 +171,10 @@ export default function RouteMap({
         })
       })
 
-      // Click on an unclustered stop — open a popup with details + action.
-      map.on('click', LYR_STOPS_POINTS, (e) => {
+      // Shared stop-click handler used for both the clustered "regular"
+      // points layer and the never-clustered "fuel" points layer. Same
+      // popup, same toggle behavior — only the source layer differs.
+      function onStopClick(e: mapboxgl.MapLayerMouseEvent) {
         const feature = e.features?.[0]
         if (!feature || feature.geometry.type !== 'Point') return
         const id = feature.properties?.['id'] as string | undefined
@@ -166,19 +190,27 @@ export default function RouteMap({
           popupRef.current?.remove()
           popupRef.current = null
         })
-      })
+      }
+      map.on('click', LYR_STOPS_POINTS, onStopClick)
+      map.on('click', LYR_FUEL_STOPS_POINTS, onStopClick)
 
       // Hover sync: tell the parent which stop the user is over so the
-      // list can highlight + scroll-into-view in tandem.
-      map.on('mouseenter', LYR_STOPS_POINTS, (e) => {
+      // list can highlight + scroll-into-view in tandem. Fuel layer
+      // gets the same treatment so hover crosswalking works regardless
+      // of which kind of dot the user is over.
+      function onStopMouseEnter(e: mapboxgl.MapLayerMouseEvent) {
         map.getCanvas().style.cursor = 'pointer'
         const id = e.features?.[0]?.properties?.['id'] as string | undefined
         if (id) onHoverStopRef.current(id)
-      })
-      map.on('mouseleave', LYR_STOPS_POINTS, () => {
+      }
+      function onStopMouseLeave() {
         map.getCanvas().style.cursor = ''
         onHoverStopRef.current(null)
-      })
+      }
+      map.on('mouseenter', LYR_STOPS_POINTS, onStopMouseEnter)
+      map.on('mouseleave', LYR_STOPS_POINTS, onStopMouseLeave)
+      map.on('mouseenter', LYR_FUEL_STOPS_POINTS, onStopMouseEnter)
+      map.on('mouseleave', LYR_FUEL_STOPS_POINTS, onStopMouseLeave)
       map.on('mouseenter', LYR_STOPS_CLUSTERS, () => {
         map.getCanvas().style.cursor = 'pointer'
       })
@@ -210,14 +242,22 @@ export default function RouteMap({
   }, [route, stops, reciprocity, restrictions])
 
   // Render / update the suggested-stops layer separately so toggling a
-  // stop's selection state doesn't redraw the whole route.
+  // stop's selection state doesn't redraw the whole route. fuelMeta is
+  // forwarded so the partitioning happens inside upsertStopsLayer.
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
-    const apply = () => upsertStopsLayer(map, suggestedStops, selectedStopIds, hoveredStopId)
+    const apply = () =>
+      upsertStopsLayer(
+        map,
+        suggestedStops,
+        selectedStopIds,
+        hoveredStopId,
+        fuelSuggestionMeta
+      )
     if (map.isStyleLoaded()) apply()
     else map.once('load', apply)
-  }, [suggestedStops, selectedStopIds, hoveredStopId])
+  }, [suggestedStops, selectedStopIds, hoveredStopId, fuelSuggestionMeta])
 
   if (!PUBLIC_TOKEN) {
     return (
@@ -258,6 +298,16 @@ export default function RouteMap({
           <span className="route-map-legend__item route-map-legend__item--lower">
             <i className="route-map-legend__lower" />Lower-risk
           </span>
+          {fuelSuggestionMeta && fuelSuggestionMeta.size > 0 && (
+            <>
+              <span className="route-map-legend__item route-map-legend__item--fuel-strict">
+                <i className="route-map-legend__fuel-strict" />Strict-state top-off
+              </span>
+              <span className="route-map-legend__item route-map-legend__item--fuel-low">
+                <i className="route-map-legend__fuel-low" />Low-fuel suggestion
+              </span>
+            </>
+          )}
         </span>
       </header>
 
@@ -671,11 +721,27 @@ function upsertStopsLayer(
   map: mapboxgl.Map,
   stops: EnrichedStop[],
   selectedIds: string[],
-  hoveredId: string | null
+  hoveredId: string | null,
+  fuelMeta?: Map<
+    string,
+    { kind: 'low_fuel' | 'strict_state_topoff'; reason: string }
+  >
 ) {
-  const fc = {
+  // Partition stops: anything keyed in fuelMeta goes on the always-
+  // visible fuel layer; the rest stay on the clustered layer. This is
+  // the change that fixes "I can't see fuel stops at continent zoom"
+  // — they're now exempt from clustering entirely.
+  const regular: EnrichedStop[] = []
+  const fuel: EnrichedStop[] = []
+  for (const s of stops) {
+    if (fuelMeta?.has(s.id)) fuel.push(s)
+    else regular.push(s)
+  }
+
+  // ----- Regular (clustered) source -----
+  const regularFc = {
     type: 'FeatureCollection' as const,
-    features: stops.map((s) => ({
+    features: regular.map((s) => ({
       type: 'Feature' as const,
       geometry: { type: 'Point' as const, coordinates: [s.lng, s.lat] },
       properties: {
@@ -689,106 +755,162 @@ function upsertStopsLayer(
     })),
   }
 
-  const existing = map.getSource(SRC_STOPS) as mapboxgl.GeoJSONSource | undefined
-  if (existing) {
-    existing.setData(fc)
-    return
+  const existingRegular = map.getSource(SRC_STOPS) as
+    | mapboxgl.GeoJSONSource
+    | undefined
+  if (existingRegular) {
+    existingRegular.setData(regularFc)
+  } else {
+    // First-time setup of the regular source + 3 layers.
+    //
+    // clusterMaxZoom is set high (14) so clustering only fires at very
+    // low zoom — when viewing a multi-state route at continent scale.
+    // clusterRadius is small (24px) so dots are eager to break apart.
+    map.addSource(SRC_STOPS, {
+      type: 'geojson',
+      data: regularFc,
+      cluster: true,
+      clusterMaxZoom: 14,
+      clusterRadius: 24,
+    })
+
+    // Cluster badges: square-rounded amber-bordered tile.
+    map.addLayer({
+      id: LYR_STOPS_CLUSTERS,
+      type: 'circle',
+      source: SRC_STOPS,
+      filter: ['has', 'point_count'],
+      paint: {
+        'circle-color': '#1a1208',
+        'circle-stroke-color': STOP_STROKE,
+        'circle-stroke-width': 1.5,
+        'circle-radius': [
+          'step',
+          ['get', 'point_count'],
+          13, 5,
+          16, 15,
+          19,
+        ],
+        'circle-opacity': 0.92,
+      },
+    })
+
+    map.addLayer({
+      id: LYR_STOPS_CLUSTER_COUNT,
+      type: 'symbol',
+      source: SRC_STOPS,
+      filter: ['has', 'point_count'],
+      layout: {
+        'text-field': ['concat', '+', ['get', 'point_count_abbreviated']],
+        'text-font': ['DIN Offc Pro Medium', 'Arial Unicode MS Bold'],
+        'text-size': 11,
+        'text-allow-overlap': true,
+      },
+      paint: {
+        'text-color': STOP_STROKE,
+      },
+    })
+
+    map.addLayer({
+      id: LYR_STOPS_POINTS,
+      type: 'circle',
+      source: SRC_STOPS,
+      filter: ['!', ['has', 'point_count']],
+      paint: {
+        'circle-color': [
+          'case',
+          ['==', ['get', 'selected'], 1], STOP_FILL_SELECTED,
+          STOP_FILL_UNSELECTED,
+        ],
+        'circle-stroke-color': [
+          'case',
+          ['==', ['get', 'hovered'], 1], STOP_STROKE_HOVERED,
+          STOP_STROKE,
+        ],
+        'circle-radius': [
+          'case',
+          ['==', ['get', 'hovered'], 1], 8,
+          ['==', ['get', 'selected'], 1], 6.5,
+          5,
+        ],
+        'circle-stroke-width': [
+          'case',
+          ['==', ['get', 'hovered'], 1], 2.5,
+          ['==', ['get', 'selected'], 1], 2,
+          1.5,
+        ],
+      },
+    })
   }
 
-  // First-time setup of source + 3 layers (cluster badges, cluster
-  // counts, individual stop dots).
-  //
-  // clusterMaxZoom is set high (14) so clustering only fires at very low
-  // zoom — when viewing a multi-state route at continent scale. As soon
-  // as the user zooms to anything closer than "see two states at once,"
-  // individual stop dots appear and become directly clickable.
-  // clusterRadius is small (24px) so dots are eager to break apart.
-  map.addSource(SRC_STOPS, {
-    type: 'geojson',
-    data: fc,
-    cluster: true,
-    clusterMaxZoom: 14,
-    clusterRadius: 24,
-  })
+  // ----- Fuel (non-clustered) source -----
+  const fuelFc = {
+    type: 'FeatureCollection' as const,
+    features: fuel.map((s) => {
+      const meta = fuelMeta!.get(s.id)!
+      return {
+        type: 'Feature' as const,
+        geometry: { type: 'Point' as const, coordinates: [s.lng, s.lat] },
+        properties: {
+          id: s.id,
+          name: s.name,
+          category: s.category,
+          score: s.score,
+          selected: selectedIds.includes(s.id) ? 1 : 0,
+          hovered: s.id === hoveredId ? 1 : 0,
+          fuelKind: meta.kind,
+        },
+      }
+    }),
+  }
 
-  // Cluster badges: square-rounded amber-bordered tile. Distinct shape
-  // from waypoint pins (which are tall teardrops) and individual stop
-  // dots (which are small circles). The square shape signals "this is a
-  // count, not a stop."
-  map.addLayer({
-    id: LYR_STOPS_CLUSTERS,
-    type: 'circle',
-    source: SRC_STOPS,
-    filter: ['has', 'point_count'],
-    paint: {
-      'circle-color': '#1a1208',
-      'circle-stroke-color': STOP_STROKE,
-      'circle-stroke-width': 1.5,
-      // Use a wider/larger circle so the "+N" text fits comfortably,
-      // and so it visually reads more like a label than a pin.
-      'circle-radius': [
-        'step',
-        ['get', 'point_count'],
-        13, 5,
-        16, 15,
-        19,
-      ],
-      'circle-opacity': 0.92,
-    },
-  })
+  const existingFuel = map.getSource(SRC_FUEL_STOPS) as
+    | mapboxgl.GeoJSONSource
+    | undefined
+  if (existingFuel) {
+    existingFuel.setData(fuelFc)
+  } else {
+    map.addSource(SRC_FUEL_STOPS, {
+      type: 'geojson',
+      data: fuelFc,
+      // Crucially: NO cluster: true. Fuel stops are always visible as
+      // individual dots regardless of zoom level.
+    })
 
-  map.addLayer({
-    id: LYR_STOPS_CLUSTER_COUNT,
-    type: 'symbol',
-    source: SRC_STOPS,
-    filter: ['has', 'point_count'],
-    layout: {
-      // Prefix with "+" so it visually distinguishes from the numbered
-      // waypoint pins ("1", "2", etc.). "+5" reads as "5 more" not "stop 5."
-      'text-field': ['concat', '+', ['get', 'point_count_abbreviated']],
-      'text-font': ['DIN Offc Pro Medium', 'Arial Unicode MS Bold'],
-      'text-size': 11,
-      'text-allow-overlap': true,
-    },
-    paint: {
-      'text-color': STOP_STROKE,
-    },
-  })
-
-  map.addLayer({
-    id: LYR_STOPS_POINTS,
-    type: 'circle',
-    source: SRC_STOPS,
-    filter: ['!', ['has', 'point_count']],
-    paint: {
-      // Selected stops are filled; unselected are outline-only.
-      'circle-color': [
-        'case',
-        ['==', ['get', 'selected'], 1], STOP_FILL_SELECTED,
-        STOP_FILL_UNSELECTED,
-      ],
-      'circle-stroke-color': [
-        'case',
-        ['==', ['get', 'hovered'], 1], STOP_STROKE_HOVERED,
-        STOP_STROKE,
-      ],
-      // Smaller default radius so individual stops read as "click me"
-      // dots rather than "I'm a major waypoint" pins. Hover state grows
-      // them noticeably for feedback.
-      'circle-radius': [
-        'case',
-        ['==', ['get', 'hovered'], 1], 8,
-        ['==', ['get', 'selected'], 1], 6.5,
-        5,
-      ],
-      'circle-stroke-width': [
-        'case',
-        ['==', ['get', 'hovered'], 1], 2.5,
-        ['==', ['get', 'selected'], 1], 2,
-        1.5,
-      ],
-    },
-  })
+    // Fuel stops are slightly larger than regular stops at base radius
+    // and have a thicker stroke so they read as deliberate suggestions
+    // rather than just another POI dot. Stroke color encodes the kind.
+    map.addLayer({
+      id: LYR_FUEL_STOPS_POINTS,
+      type: 'circle',
+      source: SRC_FUEL_STOPS,
+      paint: {
+        'circle-color': [
+          'case',
+          ['==', ['get', 'selected'], 1], STOP_FILL_SELECTED,
+          STOP_FILL_UNSELECTED,
+        ],
+        'circle-stroke-color': [
+          'case',
+          ['==', ['get', 'fuelKind'], 'strict_state_topoff'], FUEL_STRICT_STROKE,
+          FUEL_LOW_STROKE,
+        ],
+        // A hair larger than regular stops at every state, so fuel
+        // suggestions visually outrank routine ones.
+        'circle-radius': [
+          'case',
+          ['==', ['get', 'hovered'], 1], 9,
+          ['==', ['get', 'selected'], 1], 7.5,
+          6,
+        ],
+        'circle-stroke-width': [
+          'case',
+          ['==', ['get', 'hovered'], 1], 3,
+          2.5,
+        ],
+      },
+    })
+  }
 }
 
 function showPopup(

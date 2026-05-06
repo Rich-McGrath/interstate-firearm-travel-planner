@@ -18,10 +18,31 @@ interface Env {
   MAPBOX_TOKEN: string
 }
 
+interface MapboxStep {
+  // Mapbox returns several fields per step; we only persist what the
+  // UI actually displays. instruction, road name, and distance are the
+  // minimum useful turn-by-turn payload. Duration is dropped — at the
+  // step granularity it's typically a few seconds and not actionable.
+  maneuver: { instruction: string }
+  name: string
+  distance: number // meters
+}
+
+interface MapboxLeg {
+  // `summary` is a short human-readable string like "I-95 N, US-1 N"
+  // that Mapbox composes from the dominant road names. Useful as a
+  // one-line "via" hint for each leg.
+  summary: string
+  distance: number // meters
+  duration: number // seconds
+  steps: MapboxStep[]
+}
+
 interface MapboxRoute {
   geometry: string // encoded polyline (precision 5)
   distance: number // meters
   duration: number // seconds
+  legs: MapboxLeg[]
 }
 
 interface MapboxDirectionsResponse {
@@ -36,6 +57,25 @@ export interface RouteSample {
   stateCode?: string
 }
 
+// Per-step turn-by-turn record. The Mapbox response carries more,
+// but the UI only needs instruction text, road name, and step length.
+// Distances are normalized to miles here so the client never has to
+// know about the underlying meters representation.
+export interface DirectionsStep {
+  instruction: string
+  roadName: string
+  distanceMiles: number
+}
+
+// One leg per pair of waypoints — for an N-stop trip there are N-1
+// legs. Steps inside a leg are ordered start to finish.
+export interface DirectionsLeg {
+  summary: string
+  distanceMiles: number
+  durationMinutes: number
+  steps: DirectionsStep[]
+}
+
 export interface DirectionsResult {
   distanceMiles: number
   durationMinutes: number
@@ -45,6 +85,9 @@ export interface DirectionsResult {
   // client splits the polyline at sample boundaries to color segments
   // by state.
   samples: RouteSample[]
+  // Per-leg turn-by-turn directions. One leg per waypoint pair (so an
+  // N-stop trip has N-1 legs). Used by the DirectionsPanel UI.
+  legs: DirectionsLeg[]
 }
 
 const ALLOWED_ORIGINS_RE = /^https:\/\/([\w-]+\.)?pages\.dev$|^http:\/\/localhost(:\d+)?$/
@@ -85,6 +128,12 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   dirUrl.searchParams.set('access_token', env.MAPBOX_TOKEN)
   dirUrl.searchParams.set('overview', 'full')
   dirUrl.searchParams.set('geometries', 'polyline')
+  // Steps drive the Turn-by-Turn Directions panel. They add ~5-10 KB
+  // per route on long trips, well within the existing 1-hour Cloudflare
+  // edge cache budget. We always request them rather than gating on a
+  // query param — the UI reuses the same response, and a missing-leg
+  // fallback would clutter the typed contract.
+  dirUrl.searchParams.set('steps', 'true')
   // Alternatives only available with 2 stops; with waypoints, Mapbox
   // returns a single route.
   if (coords.length === 2) {
@@ -143,12 +192,29 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       }
       samples.push(sample)
     }
+    // Map Mapbox legs into our normalized shape. Distances go to miles
+    // here so the browser never sees meters. We tolerate missing
+    // `legs` defensively — older cached responses (before steps=true)
+    // would return without legs, and the panel handles an empty list
+    // by rendering nothing.
+    const legs: DirectionsLeg[] = (r.legs ?? []).map((leg) => ({
+      summary: leg.summary ?? '',
+      distanceMiles: Number((leg.distance / 1609.34).toFixed(1)),
+      durationMinutes: Math.round(leg.duration / 60),
+      steps: (leg.steps ?? []).map((step) => ({
+        instruction: step.maneuver?.instruction ?? '',
+        roadName: step.name ?? '',
+        distanceMiles: Number((step.distance / 1609.34).toFixed(2)),
+      })),
+    }))
+
     routes.push({
       distanceMiles: Math.round(r.distance / 1609.34),
       durationMinutes: Math.round(r.duration / 60),
       statesCrossed: states,
       geometry: r.geometry,
       samples,
+      legs,
     })
   }
 

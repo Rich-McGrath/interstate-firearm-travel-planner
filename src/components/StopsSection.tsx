@@ -181,6 +181,7 @@ export default function StopsSection({
               hoveredStopId={hoveredStopId}
               onToggleStop={onToggleSelect}
               onHoverStop={onHoverStop}
+              fuelSuggestionMeta={fuelSuggestionMeta}
             />
           </Suspense>
         </div>
