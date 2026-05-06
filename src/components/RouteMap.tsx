@@ -7,11 +7,13 @@ import type {
   RestrictionResult,
   RiskLevel,
   RouteOption,
+  StopRecommendation,
   TripStop,
 } from '../types/domain'
 import type { EnrichedStop } from '../rules/enrichStops'
 import { riskLevelForState } from '../rules/riskLevelForState'
 import { getStateProfile } from '../data/states'
+import { buildAllExportUrls } from '../services/exportMaps'
 
 interface Props {
   route: RouteOption
@@ -313,10 +315,9 @@ export default function RouteMap({
 
       {/* Collapsible explainer + quick "open in" links live in one row.
           The links open the trip in a third-party nav app in a new tab.
-          Origin and destination are taken from the user's first and last
-          trip stops; intermediate stops are passed as waypoints to
-          Google Maps (the only one of the three that supports them via
-          deep link). Apple and Waze fall back to single-destination. */}
+          URL building lives in services/exportMaps.ts so the Waze hide
+          rule and Apple Maps multi-stop chaining stay consistent with
+          the Export panel below — single source of truth. */}
       <div className="route-map__toolbar">
         <div className="route-map__explainer">
           <button
@@ -383,42 +384,38 @@ export default function RouteMap({
           const origin = stops[0]
           const destination = stops[stops.length - 1]
           if (!origin?.label || !destination?.label) return null
-          const intermediates = stops.slice(1, -1)
 
-          // Google supports multi-stop waypoints joined by '|'.
-          const gp = new URLSearchParams()
-          gp.set('api', '1')
-          gp.set('origin', origin.label)
-          gp.set('destination', destination.label)
-          if (intermediates.length > 0) {
-            const wp = intermediates
-              .map((s) => s.label)
-              .filter(Boolean)
-              .join('|')
-            if (wp) gp.set('waypoints', wp)
-          }
-          gp.set('travelmode', 'driving')
-          const googleUrl = `https://www.google.com/maps/dir/?${gp.toString()}`
+          // Combine user-planned waypoints with the user's selected
+          // suggested stops (manual additions plus fuel-aware
+          // auto-adds). This matches what the Export panel sends so
+          // the two surfaces produce the same routes — fixing the
+          // bug where Apple/Google Maps from the toolbar ignored
+          // everything beyond the origin and destination.
+          const userIntermediates: StopRecommendation[] = stops
+            .slice(1, -1)
+            .map((s) => ({
+              id: s.id,
+              name: s.label,
+              category: 'gas_food' as const,
+              address: s.label,
+              lat: s.coords?.lat ?? 0,
+              lng: s.coords?.lng ?? 0,
+              distanceOffRouteMiles: 0,
+              score: 0,
+              label: 'recommended' as const,
+              reasons: [],
+            }))
+          const selectedSuggested = suggestedStops.filter((s) =>
+            selectedStopIds.includes(s.id)
+          )
+          const allWaypoints = [...userIntermediates, ...selectedSuggested]
 
-          // Apple — single destination via universal link. Multi-stop
-          // not supported here; user adds stops in-app after opening.
-          const ap = new URLSearchParams()
-          ap.set('saddr', origin.label)
-          ap.set('daddr', destination.label)
-          ap.set('dirflg', 'd')
-          const appleUrl = `https://maps.apple.com/?${ap.toString()}`
-
-          // Waze — single destination, prefer coordinates if we have
-          // them so the deep link is unambiguous, fall back to query.
-          const wp = new URLSearchParams()
-          if (destination.coords) {
-            wp.set('ll', `${destination.coords.lat},${destination.coords.lng}`)
-            wp.set('q', destination.label)
-          } else {
-            wp.set('q', destination.label)
-          }
-          wp.set('navigate', 'yes')
-          const wazeUrl = `https://waze.com/ul?${wp.toString()}`
+          const { google: googleUrl, apple: appleUrl, waze: wazeUrl } =
+            buildAllExportUrls({
+              origin: origin.label,
+              destination: destination.label,
+              waypoints: allWaypoints,
+            })
 
           return (
             <div
@@ -445,15 +442,17 @@ export default function RouteMap({
               >
                 Apple
               </a>
-              <a
-                href={wazeUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="route-map__export-link"
-                title="Open destination in Waze"
-              >
-                Waze
-              </a>
+              {wazeUrl && (
+                <a
+                  href={wazeUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="route-map__export-link"
+                  title="Open destination in Waze"
+                >
+                  Waze
+                </a>
+              )}
             </div>
           )
         })()}

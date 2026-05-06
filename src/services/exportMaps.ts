@@ -76,11 +76,38 @@ function encodeApplePlace(s: string): string {
 export function buildWazeUrl(t: ExportTarget): string {
   // Waze public URL scheme is single-destination only — see
   // https://developers.google.com/waze/deeplinks. When a trip has
-  // intermediate stops the caller (ExportPanel) hides the Waze button
-  // entirely; this function unconditionally targets the final destination
-  // so the button is meaningful when it is shown.
+  // intermediate stops the caller hides the Waze button entirely
+  // (see buildAllExportUrls below); this function unconditionally
+  // targets the final destination so the button is meaningful when
+  // it is shown.
   const params = new URLSearchParams()
   params.set('q', t.destination)
   params.set('navigate', 'yes')
   return `https://waze.com/ul?${params.toString()}`
+}
+
+// Single source of truth for "which export buttons are valid for this
+// target." Owns the Waze hide rule so every surface that exposes
+// open-in-X buttons (the Export panel, the Map Route toolbar, anything
+// added later) stays in sync without each one duplicating the check.
+//
+// Same pattern as the strict-state classification rule: one place that
+// decides, every consumer reads from it. See 04-design-decisions.md.
+export interface ExportUrlSet {
+  google: string
+  apple: string
+  // Null when the target has intermediate stops — Waze can't carry
+  // them and a single-destination link would silently produce a
+  // misleading partial route. Consumers should hide the Waze button
+  // when this is null.
+  waze: string | null
+}
+
+export function buildAllExportUrls(t: ExportTarget): ExportUrlSet {
+  const hasIntermediateStops = (t.waypoints?.length ?? 0) > 0
+  return {
+    google: buildGoogleMapsUrl(t),
+    apple: buildAppleMapsUrl(t),
+    waze: hasIntermediateStops ? null : buildWazeUrl(t),
+  }
 }
