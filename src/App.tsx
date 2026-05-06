@@ -5,7 +5,6 @@ import RouteAndFopaPanel from './components/RouteAndFopaPanel'
 import StateLawPanel from './components/StateLawPanel'
 import DutySummaryPanel from './components/DutySummaryPanel'
 import StopsSection from './components/StopsSection'
-import DirectionsPanel from './components/DirectionsPanel'
 import ExportPanel from './components/ExportPanel'
 import RecentTripsMenu from './components/RecentTripsMenu'
 import TrustModeToggle from './components/TrustModeToggle'
@@ -278,6 +277,31 @@ export default function App() {
     return map
   }, [fuelPlan])
 
+  // Project fuel suggestions onto the directions grid for the
+  // Turn-by-Turn tab. Pulls stop names out of the enriched stops list
+  // so the in-line banner can show "Buc-ee's" rather than just a
+  // milestone marker. Empty array when fuel-aware planning isn't
+  // active or when stops haven't loaded yet — DirectionsPanel handles
+  // both cases.
+  const fuelInsertionsForDirections = useMemo(() => {
+    const all = [...fuelPlan.autoAdd, ...fuelPlan.suggest]
+    if (all.length === 0) return []
+    const byId = new Map(enrichedStops.map((s) => [s.id, s]))
+    return all
+      .map((s) => {
+        const stop = byId.get(s.stopId)
+        if (!stop) return null
+        return {
+          stopId: s.stopId,
+          kind: s.kind,
+          reason: s.reason,
+          milesFromOrigin: s.milesFromOrigin,
+          stopName: stop.name,
+        }
+      })
+      .filter((x): x is NonNullable<typeof x> => x !== null)
+  }, [fuelPlan, enrichedStops])
+
   // Track which auto-add fuel stops we've already merged into the
   // user's selection so re-renders (e.g., the user toggling something
   // off) don't immediately re-add them. This is the "auto-add once,
@@ -376,7 +400,7 @@ export default function App() {
                 fopa={evaluation.fopa}
               />
 
-              {/* Route & Refueling Stops (map + sidebar) */}
+              {/* Route & Refueling Stops (map + sidebar tabs) */}
               <StopsSection
                 route={evaluation.route}
                 tripStops={trip.stops}
@@ -392,12 +416,9 @@ export default function App() {
                 onToggleSelect={toggleStop}
                 onHoverStop={setHoveredStopId}
                 fuelSuggestionMeta={fuelSuggestionMeta}
-              />
-
-              {/* Turn-by-turn directions, per leg, collapsible */}
-              <DirectionsPanel
                 legs={evaluation.route.legs}
                 legLabels={legLabels}
+                fuelInsertions={fuelInsertionsForDirections}
               />
 
               {/* Duty to inform by state */}

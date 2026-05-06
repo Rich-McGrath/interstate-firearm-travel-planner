@@ -1703,83 +1703,45 @@ p { margin: 0 0 0.8em; color: var(--cream-1); }
 }
 
 /* =====================================================================
-   Vehicle profiles (inside Transport conditions fieldset)
+   Inline-label field (label above, control below; used in compact rows
+   like the fuel inputs and small filter strips)
    ===================================================================== */
+.field--inline {
+  display: flex;
+  flex-direction: column;
+}
 
-.vehicle-profiles {
+/* =====================================================================
+   Fuel inputs (Transport conditions fieldset)
+   Two compact number fields plus a live "Range ≈ N mi" readout that
+   doubles as a sanity check (typo on tank size shows up here before
+   the user submits). Fields stack on narrow screens via flex-wrap.
+   ===================================================================== */
+.fuel-inputs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.7rem 1rem;
   margin-bottom: 1rem;
   padding-bottom: 0.85rem;
   border-bottom: 1px dashed var(--ink-rule);
 }
 
-.vehicle-profiles__row {
-  display: flex;
-  align-items: flex-end;
-  gap: 0.7rem;
-  flex-wrap: wrap;
-}
-
-.vehicle-profiles__row .field { flex: 1; min-width: 220px; margin: 0; }
-
-.vehicle-profiles__manager {
-  margin-top: 0.85rem;
-  padding: 0.85rem;
-  background: var(--ink-1);
-  border: 1px solid var(--ink-rule);
-  border-radius: var(--radius);
-}
-
-.vehicle-profiles__save-row {
-  display: flex;
-  gap: 0.6rem;
-  flex-wrap: wrap;
-  margin-bottom: 0.85rem;
-}
-
-.vehicle-profiles__save-row input {
-  flex: 1;
-  min-width: 180px;
-  background: var(--ink-2);
-  color: var(--cream-1);
-  border: 1px solid var(--ink-rule-2);
-  border-radius: 3px;
-  padding: 0.5rem 0.7rem;
-  font-family: inherit;
-  font-size: 0.92rem;
-}
-
-.vehicle-profiles__list {
-  list-style: none;
+.fuel-inputs .field--inline {
   margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
+  min-width: 140px;
+  flex: 0 1 auto;
 }
 
-.vehicle-profiles__list li {
-  display: flex;
-  align-items: center;
-  gap: 0.7rem;
-  padding: 0.4rem 0.55rem;
-  background: var(--ink-2);
-  border: 1px solid var(--ink-rule);
-  border-radius: 3px;
-  font-size: 0.88rem;
+.fuel-inputs__range {
+  color: var(--amber-2);
+  letter-spacing: 0.04em;
+  padding-bottom: 0.45rem;
 }
 
-.vehicle-profiles__name {
-  flex: 1;
-  color: var(--cream-1);
-  font-weight: 500;
-}
-
-.vehicle-profiles__settings { color: var(--cream-3); }
-
-/* Field that lays out label and control inline (used by vehicle picker) */
-.field--inline {
-  display: flex;
-  flex-direction: column;
+.fuel-inputs__hint {
+  flex: 1 1 200px;
+  padding-bottom: 0.45rem;
 }
 
 .field--inline > span {
@@ -1935,6 +1897,68 @@ p { margin: 0 0 0.8em; color: var(--cream-1); }
 
 .checkbox--inline {
   margin-bottom: 0.1rem; /* baseline-align with the select fields */
+}
+
+/* Sidebar tabs — Suggestions vs Turn-by-Turn. Lives at the top of the
+   sidebar, above the scrollable tab panels. Counts in monospace mirror
+   the rest of the app's metadata typography. */
+.stops-section__tabs {
+  display: flex;
+  gap: 0.25rem;
+  margin-bottom: 0.7rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--ink-rule);
+}
+
+.stops-section__tab {
+  appearance: none;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--cream-3);
+  font-family: var(--mono);
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 0.45rem 0.65rem 0.35rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.stops-section__tab:hover:not(:disabled) {
+  color: var(--cream-1);
+}
+
+.stops-section__tab.is-active {
+  color: var(--amber);
+  border-bottom-color: var(--amber);
+}
+
+.stops-section__tab:disabled {
+  color: var(--ink-rule-2);
+  cursor: not-allowed;
+}
+
+.stops-section__tab-count {
+  font-size: 0.7rem;
+  color: var(--cream-3);
+  background: var(--ink-3);
+  padding: 0.05rem 0.35rem;
+  border-radius: 3px;
+}
+
+.stops-section__tab.is-active .stops-section__tab-count {
+  color: var(--amber);
+  background: var(--amber-soft);
+}
+
+.stops-section__tab-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
 }
 
 /* Side-by-side layout: map on the left, sidebar on the right */
@@ -2391,16 +2415,6 @@ p { margin: 0 0 0.8em; color: var(--cream-1); }
   color: var(--ink-1);
 }
 
-.vehicle-profile__intro {
-  margin: 0 0 0.85rem;
-}
-
-.vehicle-profile__save-actions {
-  display: flex;
-  gap: 0.6rem;
-  flex-wrap: wrap;
-}
-
 
 /* =====================================================================
    Mobile
@@ -2568,6 +2582,81 @@ p { margin: 0 0 0.8em; color: var(--cream-1); }
   font-size: 0.74rem;
   color: var(--cream-3);
   letter-spacing: 0.03em;
+}
+
+/* Top metadata line — replaces the standalone-card header now that
+   the panel lives inside a sidebar tab. Compact, mono, muted. */
+.directions-panel__meta {
+  color: var(--cream-3);
+  letter-spacing: 0.04em;
+  margin-bottom: 0.4rem;
+}
+
+/* Inline fuel banners interleaved between maneuver steps. Two flavors
+   matching the rest of the fuel-aware system: red for strict-state
+   top-offs, cyan for low-fuel suggestions. Indented to align with
+   step bodies (not numbered) so they read as "places, not turns." */
+.directions-panel__fuel-marker {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.55rem;
+  align-items: center;
+  padding: 0.55rem 0.7rem;
+  margin: 0.3rem 0;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  list-style: none;
+}
+
+.directions-panel__fuel-marker--strict_state_topoff {
+  background: rgba(212, 69, 69, 0.10);
+  border-color: rgba(212, 69, 69, 0.32);
+  color: #f4a8a8;
+}
+
+.directions-panel__fuel-marker--strict_state_topoff .directions-panel__fuel-marker-tag {
+  color: #d44545;
+  font-weight: 600;
+}
+
+.directions-panel__fuel-marker--low_fuel {
+  background: rgba(92, 184, 212, 0.10);
+  border-color: rgba(92, 184, 212, 0.32);
+  color: #b6dde8;
+}
+
+.directions-panel__fuel-marker--low_fuel .directions-panel__fuel-marker-tag {
+  color: #5cb8d4;
+  font-weight: 600;
+}
+
+.directions-panel__fuel-marker-tag {
+  white-space: nowrap;
+}
+
+.directions-panel__fuel-marker-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.directions-panel__fuel-marker-name {
+  color: var(--cream-1);
+  font-size: 0.88rem;
+  font-weight: 500;
+}
+
+.directions-panel__fuel-marker-reason {
+  font-size: 0.74rem;
+  letter-spacing: 0.02em;
+}
+
+/* Sidebar context: tighten the leg body indentation since the sidebar
+   has only 380px to work with. The standalone-card padding (3.05rem
+   on the left) crowded the step text once embedded. */
+.stops-section__sidebar .directions-panel__leg-body {
+  padding-left: 1rem;
 }
 
 @media (max-width: 540px) {

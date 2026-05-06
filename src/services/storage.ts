@@ -17,7 +17,6 @@ const NS = `iftp:v${SCHEMA_VERSION}`
 const KEYS = {
   currentTrip: `${NS}:currentTrip`,
   recentTrips: `${NS}:recentTrips`,
-  vehicleProfiles: `${NS}:vehicleProfiles`,
   preferences: `${NS}:preferences`,
 } as const
 
@@ -107,41 +106,6 @@ export function deleteRecentTrip(id: string): void {
 
 export function clearRecentTrips(): void {
   remove(KEYS.recentTrips)
-}
-
-// ---------------------------------------------------------------------------
-// Vehicle profiles — saved transport conditions
-// ---------------------------------------------------------------------------
-
-export interface VehicleProfile {
-  id: string
-  name: string
-  vehicleHasSeparateTrunk: boolean
-  lockedContainerUsed: boolean
-  firearmAccessibleFromPassengerCompartment: boolean
-  ammoAccessibleFromPassengerCompartment: boolean
-  // Fuel-aware routing fields. Both must be present for fuel logic to
-  // activate; either undefined or zero falls back to non-fuel-aware
-  // routing. Reasonable ranges: mpg 5-100, tankSize 5-50 gallons.
-  mpg?: number
-  tankSizeGallons?: number
-}
-
-export function getVehicleProfiles(): VehicleProfile[] {
-  return read<VehicleProfile[]>(KEYS.vehicleProfiles) ?? []
-}
-
-export function saveVehicleProfile(profile: VehicleProfile): void {
-  const list = getVehicleProfiles()
-  const idx = list.findIndex((p) => p.id === profile.id)
-  if (idx >= 0) list[idx] = profile
-  else list.push(profile)
-  write(KEYS.vehicleProfiles, list)
-}
-
-export function deleteVehicleProfile(id: string): void {
-  const list = getVehicleProfiles().filter((p) => p.id !== id)
-  write(KEYS.vehicleProfiles, list)
 }
 
 // ---------------------------------------------------------------------------

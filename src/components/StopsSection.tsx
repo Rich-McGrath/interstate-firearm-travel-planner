@@ -1,5 +1,6 @@
-import { lazy, Suspense, useEffect, useRef } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import type {
+  DirectionsLeg,
   ReciprocityResult,
   RestrictionResult,
   RouteOption,
@@ -14,6 +15,9 @@ import {
   formatStopLabel,
   stopLabelClassName,
 } from '../utils/format'
+import DirectionsPanel, {
+  type DirectionsFuelInsertion,
+} from './DirectionsPanel'
 
 // RouteMap is large (Mapbox GL ~500 KB gzipped). Keep the lazy import
 // here so this section can be rendered without immediately pulling
@@ -45,6 +49,11 @@ interface Props {
     string,
     { kind: 'low_fuel' | 'strict_state_topoff'; reason: string }
   >
+  // Turn-by-turn directions for the selected route. Per-leg, with
+  // optional fuel insertions interleaved between maneuver steps.
+  legs: DirectionsLeg[]
+  legLabels: string[]
+  fuelInsertions?: DirectionsFuelInsertion[]
 }
 
 export default function StopsSection({
@@ -62,7 +71,17 @@ export default function StopsSection({
   onToggleSelect,
   onHoverStop,
   fuelSuggestionMeta,
+  legs,
+  legLabels,
+  fuelInsertions,
 }: Props) {
+  // Sidebar tabs: Suggestions (the original list) vs Turn-by-Turn
+  // (the directions panel, embedded). Default to Suggestions because
+  // it's the primary trip-planning surface; users opt into directions
+  // explicitly. Tab state isn't persisted — disposable UI state.
+  const [sidebarTab, setSidebarTab] = useState<'suggestions' | 'directions'>(
+    'suggestions'
+  )
   // Partition into selected (pinned to top of sidebar) and unselected
   // (the "Suggestions" body). Selected list preserves the order in
   // which stops were added, which matches the user's mental model
@@ -187,67 +206,130 @@ export default function StopsSection({
         </div>
 
         <aside className="stops-section__sidebar" ref={sidebarRef}>
-          {loading && totalCount === 0 ? (
-            <p className="muted">Finding stops along the route…</p>
-          ) : !loading && totalCount === 0 ? (
-            <p className="muted">No stops found along this route.</p>
-          ) : (
-            <>
-              {selectedStops.length > 0 && (
-                <div className="sidebar-group sidebar-group--selected">
+          {/* Tab strip — Suggestions is the primary, directions are
+              auxiliary. Both tabs are always rendered (no lazy mount)
+              because switching back-and-forth shouldn't lose scroll
+              position or trigger flashes. The hidden tab is just
+              display:none. */}
+          <div className="stops-section__tabs" role="tablist">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={sidebarTab === 'suggestions'}
+              className={`stops-section__tab ${
+                sidebarTab === 'suggestions' ? 'is-active' : ''
+              }`}
+              onClick={() => setSidebarTab('suggestions')}
+            >
+              Suggestions
+              {scored.length > 0 && (
+                <span className="stops-section__tab-count mono">
+                  {scored.length}
+                </span>
+              )}
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={sidebarTab === 'directions'}
+              className={`stops-section__tab ${
+                sidebarTab === 'directions' ? 'is-active' : ''
+              }`}
+              onClick={() => setSidebarTab('directions')}
+              disabled={legs.length === 0}
+            >
+              Turn-by-Turn
+              {legs.length > 0 && (
+                <span className="stops-section__tab-count mono">
+                  {legs.length}
+                </span>
+              )}
+            </button>
+          </div>
+
+          <div
+            className="stops-section__tab-panel"
+            style={{ display: sidebarTab === 'suggestions' ? undefined : 'none' }}
+            role="tabpanel"
+          >
+            {loading && totalCount === 0 ? (
+              <p className="muted">Finding stops along the route…</p>
+            ) : !loading && totalCount === 0 ? (
+              <p className="muted">No stops found along this route.</p>
+            ) : (
+              <>
+                {selectedStops.length > 0 && (
+                  <div className="sidebar-group sidebar-group--selected">
+                    <h3 className="sidebar-group__title">
+                      Selected
+                      <span className="sidebar-group__count mono">
+                        {selectedStops.length}
+                      </span>
+                    </h3>
+                    <ul className="sidebar-cards">
+                      {selectedStops.map((stop) => (
+                        <CompactStopCard
+                          key={stop.id}
+                          stop={stop}
+                          selected
+                          hovered={stop.id === hoveredStopId}
+                          onToggle={onToggleSelect}
+                          onHover={onHoverStop}
+                          fuelMeta={fuelSuggestionMeta?.get(stop.id)}
+                        />
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                <div className="sidebar-group">
                   <h3 className="sidebar-group__title">
-                    Selected
+                    {selectedStops.length > 0 ? 'Suggestions' : 'All stops'}
                     <span className="sidebar-group__count mono">
-                      {selectedStops.length}
+                      {unselectedStops.length}
                     </span>
                   </h3>
-                  <ul className="sidebar-cards">
-                    {selectedStops.map((stop) => (
-                      <CompactStopCard
-                        key={stop.id}
-                        stop={stop}
-                        selected
-                        hovered={stop.id === hoveredStopId}
-                        onToggle={onToggleSelect}
-                        onHover={onHoverStop}
-                        fuelMeta={fuelSuggestionMeta?.get(stop.id)}
-                      />
-                    ))}
-                  </ul>
+                  {unselectedStops.length === 0 ? (
+                    <p className="muted small">
+                      {scored.length === 0
+                        ? 'No stops match the current filters.'
+                        : 'All matching stops are selected.'}
+                    </p>
+                  ) : (
+                    <ul className="sidebar-cards">
+                      {unselectedStops.map((stop) => (
+                        <CompactStopCard
+                          key={stop.id}
+                          stop={stop}
+                          selected={false}
+                          hovered={stop.id === hoveredStopId}
+                          onToggle={onToggleSelect}
+                          onHover={onHoverStop}
+                          fuelMeta={fuelSuggestionMeta?.get(stop.id)}
+                        />
+                      ))}
+                    </ul>
+                  )}
                 </div>
-              )}
+              </>
+            )}
+          </div>
 
-              <div className="sidebar-group">
-                <h3 className="sidebar-group__title">
-                  {selectedStops.length > 0 ? 'Suggestions' : 'All stops'}
-                  <span className="sidebar-group__count mono">
-                    {unselectedStops.length}
-                  </span>
-                </h3>
-                {unselectedStops.length === 0 ? (
-                  <p className="muted small">
-                    {scored.length === 0
-                      ? 'No stops match the current filters.'
-                      : 'All matching stops are selected.'}
-                  </p>
-                ) : (
-                  <ul className="sidebar-cards">
-                    {unselectedStops.map((stop) => (
-                      <CompactStopCard
-                        key={stop.id}
-                        stop={stop}
-                        selected={false}
-                        hovered={stop.id === hoveredStopId}
-                        onToggle={onToggleSelect}
-                        onHover={onHoverStop}
-                        fuelMeta={fuelSuggestionMeta?.get(stop.id)}
-                      />
-                    ))}
-                  </ul>
-                )}
-              </div>
-            </>
-          )}
+          <div
+            className="stops-section__tab-panel"
+            style={{ display: sidebarTab === 'directions' ? undefined : 'none' }}
+            role="tabpanel"
+          >
+            {legs.length === 0 ? (
+              <p className="muted">No directions available for this route.</p>
+            ) : (
+              <DirectionsPanel
+                legs={legs}
+                legLabels={legLabels}
+                fuelInsertions={fuelInsertions}
+              />
+            )}
+          </div>
         </aside>
       </div>
     </section>

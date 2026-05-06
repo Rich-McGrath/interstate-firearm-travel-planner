@@ -8,8 +8,6 @@ import type {
 import StopList from './StopList'
 import StateAutocomplete from './StateAutocomplete'
 import RegulatoryReminder from './RegulatoryReminder'
-import VehicleProfilePicker from './VehicleProfilePicker'
-import type { VehicleProfile } from '../services/storage'
 
 interface Props {
   onSubmit: (trip: TripInput) => void
@@ -58,12 +56,15 @@ export default function TripForm({ onSubmit, initial }: Props) {
   )
   const [vehicleHasTrunk, setVehicleHasTrunk] = useState(initial?.vehicleHasSeparateTrunk ?? true)
   const [lockedContainer, setLockedContainer] = useState(initial?.lockedContainerUsed ?? true)
-  // Fuel fields are carried on the trip when applied from a vehicle
-  // profile. Stored as numbers (or undefined) — TripInput's optional
-  // shape lets us pass through "user didn't provide fuel data."
-  const [mpg, setMpg] = useState<number | undefined>(initial?.mpg)
-  const [tankSizeGallons, setTankSizeGallons] = useState<number | undefined>(
-    initial?.tankSizeGallons
+  // Fuel fields — kept as strings while editing so empty fields don't
+  // collapse to 0 and so the inputs are forgiving of partial typing.
+  // Parsed to numbers on submit. Both must be > 0 for the fuel-aware
+  // route planner to activate; otherwise it falls back gracefully.
+  const [mpg, setMpg] = useState<string>(
+    initial?.mpg !== undefined ? String(initial.mpg) : ''
+  )
+  const [tankSizeGallons, setTankSizeGallons] = useState<string>(
+    initial?.tankSizeGallons !== undefined ? String(initial.tankSizeGallons) : ''
   )
 
   const [errors, setErrors] = useState<string[]>([])
@@ -92,20 +93,11 @@ export default function TripForm({ onSubmit, initial }: Props) {
       setVehicleHasTrunk(initial.vehicleHasSeparateTrunk)
     }
     if (initial.lockedContainerUsed !== undefined) setLockedContainer(initial.lockedContainerUsed)
-    setMpg(initial.mpg)
-    setTankSizeGallons(initial.tankSizeGallons)
+    setMpg(initial.mpg !== undefined ? String(initial.mpg) : '')
+    setTankSizeGallons(
+      initial.tankSizeGallons !== undefined ? String(initial.tankSizeGallons) : ''
+    )
   }, [initial])
-
-  function applyVehicleProfile(p: VehicleProfile) {
-    setVehicleHasTrunk(p.vehicleHasSeparateTrunk)
-    setLockedContainer(p.lockedContainerUsed)
-    setFirearmAccessible(p.firearmAccessibleFromPassengerCompartment)
-    setAmmoAccessible(p.ammoAccessibleFromPassengerCompartment)
-    // Apply fuel fields too — they're optional, so undefined here means
-    // "this profile has no fuel data; clear any previous fuel data."
-    setMpg(p.mpg)
-    setTankSizeGallons(p.tankSizeGallons)
-  }
 
   function toggleItem(item: TransportItem) {
     setItems((prev) => (prev.includes(item) ? prev.filter((i) => i !== item) : [...prev, item]))
@@ -132,6 +124,27 @@ export default function TripForm({ onSubmit, initial }: Props) {
         mag = parsed
       }
     }
+    // Parse fuel fields. Both must be > 0 to count; either being
+    // missing/invalid means the user opted out of fuel-aware planning,
+    // which is fine — planFuelStops short-circuits cleanly on zero.
+    let parsedMpg: number | undefined
+    if (mpg.trim()) {
+      const n = Number(mpg)
+      if (!Number.isFinite(n) || n <= 0) {
+        errs.push('MPG must be a positive number.')
+      } else {
+        parsedMpg = n
+      }
+    }
+    let parsedTank: number | undefined
+    if (tankSizeGallons.trim()) {
+      const n = Number(tankSizeGallons)
+      if (!Number.isFinite(n) || n <= 0) {
+        errs.push('Tank size must be a positive number.')
+      } else {
+        parsedTank = n
+      }
+    }
     if (errs.length > 0) {
       setErrors(errs)
       return
@@ -149,8 +162,8 @@ export default function TripForm({ onSubmit, initial }: Props) {
       firearmAccessibleFromPassengerCompartment: firearmAccessible,
       vehicleHasSeparateTrunk: vehicleHasTrunk,
       lockedContainerUsed: lockedContainer,
-      ...(mpg !== undefined ? { mpg } : {}),
-      ...(tankSizeGallons !== undefined ? { tankSizeGallons } : {}),
+      ...(parsedMpg !== undefined ? { mpg: parsedMpg } : {}),
+      ...(parsedTank !== undefined ? { tankSizeGallons: parsedTank } : {}),
     })
   }
 
@@ -222,15 +235,52 @@ export default function TripForm({ onSubmit, initial }: Props) {
 
       <fieldset className="fieldset">
         <legend>Transport conditions</legend>
-        <VehicleProfilePicker
-          current={{
-            vehicleHasSeparateTrunk: vehicleHasTrunk,
-            lockedContainerUsed: lockedContainer,
-            firearmAccessibleFromPassengerCompartment: firearmAccessible,
-            ammoAccessibleFromPassengerCompartment: ammoAccessible,
-          }}
-          onApply={applyVehicleProfile}
-        />
+        {/* Fuel-aware route planning. Both MPG and tank size must be
+            filled to activate — leave blank to skip the feature. The
+            estimated range is shown as a sanity check so the user can
+            spot a typo before submitting. */}
+        <div className="fuel-inputs">
+          <label className="field field--inline">
+            <span>MPG</span>
+            <input
+              type="number"
+              inputMode="decimal"
+              min="1"
+              step="0.1"
+              value={mpg}
+              onChange={(e) => setMpg(e.target.value)}
+              placeholder="e.g. 25"
+            />
+          </label>
+          <label className="field field--inline">
+            <span>Tank size, gal</span>
+            <input
+              type="number"
+              inputMode="decimal"
+              min="1"
+              step="0.1"
+              value={tankSizeGallons}
+              onChange={(e) => setTankSizeGallons(e.target.value)}
+              placeholder="e.g. 15"
+            />
+          </label>
+          {(() => {
+            const m = Number(mpg)
+            const t = Number(tankSizeGallons)
+            if (Number.isFinite(m) && Number.isFinite(t) && m > 0 && t > 0) {
+              return (
+                <span className="fuel-inputs__range mono small">
+                  Range ≈ {Math.round(m * t)} mi
+                </span>
+              )
+            }
+            return (
+              <span className="fuel-inputs__hint muted small">
+                Both fields enable fuel-aware route suggestions.
+              </span>
+            )
+          })()}
+        </div>
         <div className="checkbox-grid">
           <label className="checkbox">
             <input
