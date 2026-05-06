@@ -146,6 +146,15 @@ function rankStations(
 // Find the route mile at which the trip first enters each strict state
 // (skipping over states the route only briefly clips). Returns one
 // entry per first-entry transition.
+//
+// The recorded border mile is the MIDPOINT between the last non-strict
+// sample and the first strict sample, not the first strict sample
+// itself. With ~50-mile sample spacing the geographic border can be
+// almost a full step off from where the next sample lands; placing the
+// border at the midpoint cuts that bias roughly in half. A residual
+// uncertainty of ~25 mi is fine for fuel planning — the lookback
+// window is 80 mi and we have a separate state-code sanity check on
+// candidate stations downstream.
 interface StrictBorder {
   stateCode: string
   milesFromOrigin: number
@@ -153,31 +162,46 @@ interface StrictBorder {
 
 function findStrictBorders(routePoints: RoutePoint[]): StrictBorder[] {
   const borders: StrictBorder[] = []
-  let prev: string | undefined
+  let prev: RoutePoint | undefined
   const seen = new Set<string>()
   for (const rp of routePoints) {
-    if (rp.stateCode && rp.stateCode !== prev) {
+    if (rp.stateCode && rp.stateCode !== prev?.stateCode) {
       // First sample inside a state we haven't visited yet, AND it's
       // strict. Re-entering the same state later in the trip after a
       // brief excursion isn't double-flagged.
       if (!seen.has(rp.stateCode) && isStrictState(rp.stateCode)) {
+        // Place border at the midpoint of the transition span. If
+        // there's no prior point (route originates in a strict state)
+        // fall back to the first sample's mile — there's no PA-side
+        // mile to interpolate from anyway.
+        const borderMile =
+          prev !== undefined
+            ? (prev.milesFromOrigin + rp.milesFromOrigin) / 2
+            : rp.milesFromOrigin
         borders.push({
           stateCode: rp.stateCode,
-          milesFromOrigin: rp.milesFromOrigin,
+          milesFromOrigin: borderMile,
         })
       }
       if (rp.stateCode) seen.add(rp.stateCode)
-      prev = rp.stateCode
     }
+    if (rp.stateCode) prev = rp
   }
   return borders
 }
 
 // Pick the best station to fill up at *before* the given border mile.
-// "Before" means strictly less than borderMiles. Among candidates
-// within STRICT_BORDER_MAX_LOOKBACK_MILES of the border, prefer the
-// closest-to-border AND chain station (chain wins on ties because
-// chains are more reliably stocked and 24/7 in remote stretches).
+// "Before" means strictly less than borderMiles AND in a non-strict
+// state. The state-code check is the load-bearing correctness fix:
+// stations physically just inside the strict state can otherwise snap
+// to the on-this-side route sample (when sample spacing is wide) and
+// erroneously show up as candidates. We use stop.stateCode (filled in
+// upstream by enrichStops) which reflects each station's actual
+// physical location, not its proximity to a sample.
+//
+// Among qualifying candidates within STRICT_BORDER_MAX_LOOKBACK_MILES
+// of the border, prefer closest-to-border AND chain stations (chain
+// wins on ties because chains are more reliably stocked and 24/7).
 // Returns null if no acceptable candidate exists.
 function pickBorderTopoff(
   border: StrictBorder,
@@ -188,7 +212,15 @@ function pickBorderTopoff(
     (r) =>
       r.milesFromOrigin < border.milesFromOrigin &&
       r.milesFromOrigin >= Math.max(0, windowFloor) &&
-      (r.stop.category === 'gas' || r.stop.category === 'gas_food')
+      (r.stop.category === 'gas' || r.stop.category === 'gas_food') &&
+      // Reject stations that are physically inside the destination
+      // strict state, even if their nearest route sample placed them
+      // pre-border in mile space. Without this, a Cherry Hill NJ
+      // station can show up as a "PA top-off candidate" purely because
+      // the NJ-side route sample is closer than the PA-side one.
+      // Fall through (allow) if stateCode is missing — defensive
+      // default rather than dropping all candidates on missing data.
+      (!r.stop.stateCode || r.stop.stateCode !== border.stateCode)
   )
   if (candidates.length === 0) return null
 
