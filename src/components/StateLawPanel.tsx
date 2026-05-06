@@ -234,9 +234,6 @@ export default function StateLawPanel({
               </>
             )}
           </span>
-          <span className="muted small">
-            See <code>src/data/README.md</code> for the update workflow.
-          </span>
         </footer>
       )}
     </section>
