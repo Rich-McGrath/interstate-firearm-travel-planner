@@ -22,6 +22,18 @@ export function evaluateFopa(trip: TripInput): FopaAnalysis {
   const warnings: string[] = []
   let qualifiesPotentially: boolean | 'manual_review' = true
 
+  // Constitutional-carry transit reminder. § 926A is the governing rule
+  // during transport regardless of how the user carries at endpoints,
+  // and the easy misread is "I'm CC at home and CC at destination, so
+  // I can ignore the through-states." Surface this explicitly so it
+  // can't be missed. Placed first so it reads like the headline note,
+  // not a footnote among the qualification reasons below.
+  if (trip.relyingOnConstitutionalCarry) {
+    reasons.push(
+      'Constitutional-carry status at origin and destination does not relieve the federal § 926A baseline. FOPA conditions still govern transit through every intermediate state.'
+    )
+  }
+
   // Unloaded check
   if (!trip.firearmUnloaded) {
     reasons.push('Firearm is reported as loaded — federal baseline requires unloaded.')
@@ -85,7 +97,7 @@ export function evaluateFopa(trip: TripInput): FopaAnalysis {
       warnings.push(
         `Lawful-possession status at ${
           !originProfile ? originState : destinationState
-        } is not covered by the current dataset — manual review required.`
+        } is not in the seed dataset — manual review required.`
       )
       if (qualifiesPotentially === true) qualifiesPotentially = 'manual_review'
     }
