@@ -38,9 +38,20 @@ const LOW_FUEL_FLOOR_MILES = 30
 // How far ahead of a strict-state border we'd ideally fill up. We
 // prefer a station within 30 mi of the border (close enough that the
 // detour is small, far enough that there are options) but accept up
-// to 80 mi if nothing closer is available.
+// to 150 mi if nothing closer is available.
+//
+// Originally tuned to 80 mi, which works well in dense corridors
+// (e.g. PA → NJ on I-78, where Pilot/Love's/Wawa coverage is thick).
+// 80 mi proved too narrow on sparser long-haul corridors — notably
+// I-10 through AZ approaching CA, where Mapbox tilequery's POI
+// coverage thins out and the 80-mile pre-border window can return
+// zero gas POIs even though real stations exist. 150 mi gives the
+// planner enough room to reach the next denser cluster on those
+// stretches, at the cost of occasionally suggesting a top-off that
+// arrives "early" — a mild annoyance the user can dismiss, far less
+// damaging than silently missing the strict-state crossing entirely.
 const STRICT_BORDER_PREFER_WITHIN_MILES = 30
-const STRICT_BORDER_MAX_LOOKBACK_MILES = 80
+const STRICT_BORDER_MAX_LOOKBACK_MILES = 150
 
 // "Strict state" definition reuses the same logic as the map-overlay
 // classifier and evaluateRestrictions. Keeps a single source of truth

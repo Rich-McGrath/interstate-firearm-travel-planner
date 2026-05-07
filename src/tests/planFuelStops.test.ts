@@ -223,13 +223,13 @@ describe('planFuelStops — strict-state top-offs', () => {
   })
 
   it('skips strict-state top-off if no station is within lookback window', () => {
-    // Strict crossing at mile 300, but all stations are >100 mi back.
-    // STRICT_BORDER_MAX_LOOKBACK_MILES is 80, so none qualify.
+    // Strict crossing at mile 300, but all stations are >150 mi back.
+    // STRICT_BORDER_MAX_LOOKBACK_MILES is 150, so none qualify.
     const route = buildSyntheticRoute(
       generateSamples(600, 5, (m) => (m < 300 ? 'TX' : 'NJ'))
     )
     const stations = [
-      stationAtMile('too-far', 150), // 150 mi before border = beyond lookback
+      stationAtMile('too-far', 100), // 200 mi before border = beyond lookback
     ]
     const result = planFuelStops({
       route,
@@ -238,5 +238,27 @@ describe('planFuelStops — strict-state top-offs', () => {
       availableStations: stations,
     })
     expect(result.autoAdd).toEqual([])
+  })
+
+  it('auto-adds a station within the wider 150-mi lookback window', () => {
+    // Regression test for the lookback-window expansion. Station sits
+    // at mile 180 (120 mi before the border) — beyond the original
+    // 80-mi window but inside the 150-mi window. Pinning this case
+    // ensures sparse-corridor trips like TX -> CA via I-10 keep
+    // working as the planner is tuned over time.
+    const route = buildSyntheticRoute(
+      generateSamples(600, 5, (m) => (m < 300 ? 'TX' : 'NJ'))
+    )
+    const stations = [
+      stationAtMile('s-180', 180), // 120 mi before border, inside 150
+    ]
+    const result = planFuelStops({
+      route,
+      mpg: 25,
+      tankSizeGallons: 20,
+      availableStations: stations,
+    })
+    expect(result.autoAdd.length).toBe(1)
+    expect(result.autoAdd[0]!.stopId).toBe('s-180')
   })
 })
