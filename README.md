@@ -144,6 +144,16 @@ See the per-state data update workflow in `src/data/README.md`.
 
 ---
 
+## Link health
+
+`scripts/check-sources.mjs` (run as `npm run check-sources`) verifies that
+every URL in `officialSources.ts` still loads. It reports broken links and
+silent redirects, but cannot detect URLs that resolve to a stale or wrong
+page after a site redesign — for that, the 18-month review cadence above
+is the only safeguard.
+
+---
+
 ## License
 
 All rights reserved. See [LICENSE](LICENSE).
