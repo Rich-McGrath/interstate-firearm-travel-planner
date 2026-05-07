@@ -71,6 +71,12 @@ export interface TripInput {
   // for fuel-aware features to activate.
   mpg?: number
   tankSizeGallons?: number
+  // Constitutional-carry mode. When true, the user is carrying without
+  // a permit and relying on the destination state's CC framework. Treat
+  // as mutually exclusive with hasPermit — the form normalizes
+  // hasPermit to false when this is on, and evaluateReciprocity
+  // defends against stray combinations on its own.
+  relyingOnConstitutionalCarry?: boolean
 }
 
 // Convenience accessors so the rules engine doesn't have to reach into
@@ -103,23 +109,6 @@ export interface RouteSampleClient {
   stateCode?: string
 }
 
-// Per-step record for the Turn-by-Turn Directions panel. Distances
-// are pre-converted to miles upstream — no units conversion in the UI.
-export interface DirectionsStep {
-  instruction: string
-  roadName: string
-  distanceMiles: number
-}
-
-// One leg per waypoint pair on the trip. An N-stop trip has N-1 legs.
-// Steps inside a leg are ordered origin-to-destination of that leg.
-export interface DirectionsLeg {
-  summary: string
-  distanceMiles: number
-  durationMinutes: number
-  steps: DirectionsStep[]
-}
-
 export interface RouteOption {
   id: string
   name: string
@@ -132,11 +121,6 @@ export interface RouteOption {
   riskLevel: RiskLevel
   riskReasons: string[]
   samples: RouteSampleClient[]
-  // Per-leg turn-by-turn directions, sourced from Mapbox via
-  // /api/directions. Empty array if the Mapbox response didn't include
-  // legs (older cached responses) — the DirectionsPanel renders nothing
-  // in that case.
-  legs: DirectionsLeg[]
 }
 
 export interface AmmunitionRestriction {
@@ -183,6 +167,16 @@ export interface StateLawProfile {
   magazineLimit?: number
   hasAssaultWeaponBan?: boolean
   hasSpecialTransportRules?: boolean
+  // Whether the state has a constitutional-carry (permitless) framework.
+  // Absent on states the seed data didn't flag, including known-CC
+  // states the original notes missed (e.g. AR, FL) — those evaluate as
+  // 'manual_review' in CC mode rather than a confident 'no'.
+  hasConstitutionalCarry?: boolean
+  // Whether the CC framework is restricted to residents. Trinary
+  // because most state notes don't explicitly say one way or the
+  // other; absence on a CC state means 'we don't know' and yields
+  // 'manual_review' on residency-dependent answers.
+  constitutionalCarryResidentsOnly?: boolean | 'manual_review'
   suppressorRiskNote?: string
   nfaRiskNote?: string
   // Ammunition-specific restrictions — NJ hollow-points, certain
