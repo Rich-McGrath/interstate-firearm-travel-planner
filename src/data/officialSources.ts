@@ -34,7 +34,8 @@ const SOURCES: Record<string, OfficialSource> = {
   GA: { url: 'https://georgia.gov/apply-weapons-license', label: 'Georgia.gov' },
   HI: { url: 'https://ag.hawaii.gov/cpja/firearms/', label: 'HI Dept of the Attorney General' },
   ID: { url: 'https://isp.idaho.gov/bci/concealed-weapons/', label: 'ID State Police' },
-  IL: { url: 'https://www.isp.illinois.gov/Foid', label: 'IL State Police' },
+  // The www. host returns a non-loading response; the apex isp.illinois.gov resolves correctly.
+  IL: { url: 'https://isp.illinois.gov/Foid', label: 'IL State Police' },
   IN: { url: 'https://www.in.gov/isp/firearms-licensing/', label: 'IN State Police' },
   IA: { url: 'https://dps.iowa.gov/divisions/administrative-services/weapon-permits', label: 'IA Dept of Public Safety' },
   KS: { url: 'https://www.ag.ks.gov/licensing/concealed-carry', label: 'KS Office of the Attorney General' },
