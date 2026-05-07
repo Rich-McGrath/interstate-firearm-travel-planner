@@ -109,6 +109,24 @@ export interface RouteSampleClient {
   stateCode?: string
 }
 
+// Per-step record on a directions leg. Distances are pre-converted to
+// miles by the Pages Function so the UI doesn't have to.
+export interface DirectionsStep {
+  instruction: string
+  roadName: string
+  distanceMiles: number
+}
+
+// One leg per waypoint pair. For an N-stop trip the directions response
+// carries N-1 legs. Surfaces the per-segment metrics the
+// DirectionsPanel uses to render turn-by-turn output.
+export interface DirectionsLeg {
+  summary: string
+  distanceMiles: number
+  durationMinutes: number
+  steps: DirectionsStep[]
+}
+
 export interface RouteOption {
   id: string
   name: string
@@ -121,6 +139,7 @@ export interface RouteOption {
   riskLevel: RiskLevel
   riskReasons: string[]
   samples: RouteSampleClient[]
+  legs: DirectionsLeg[]
 }
 
 export interface AmmunitionRestriction {
