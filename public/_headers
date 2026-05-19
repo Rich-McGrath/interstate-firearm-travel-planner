@@ -1,0 +1,84 @@
+# Cloudflare Pages security headers. Lives in public/ so Vite copies it
+# to dist/_headers at build time, where Pages reads it.
+#
+# Defaults that apply to every response. Path-specific rules below
+# layer on top — same-name headers from a more specific rule win, all
+# other headers from this block are still applied.
+/*
+  # Force HTTPS for two years on every subdomain, and consent to be
+  # included on the browser preload list. Set this only once you're
+  # confident every host (apex + www + any subdomains) is HTTPS-only.
+  Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
+
+  # Browser must respect the Content-Type we send instead of guessing.
+  # Defeats a class of attacks where a response is reinterpreted as
+  # something it isn't (e.g. an uploaded HTML file served as image/*).
+  X-Content-Type-Options: nosniff
+
+  # CSP frame-ancestors below also blocks framing; X-Frame-Options is
+  # the legacy header for older browsers / scanners that want to see it.
+  X-Frame-Options: DENY
+
+  # Send only the origin (not the full URL) on cross-origin requests,
+  # and nothing at all on HTTPS->HTTP downgrades. Keeps share-link
+  # hashes (which encode the trip) from leaking to third parties when
+  # users click outbound links to Google/Apple/Waze.
+  Referrer-Policy: strict-origin-when-cross-origin
+
+  # Deny every powerful browser feature this app doesn't use. Trimmed
+  # to widely-shipped features so unknown directives don't error in
+  # older browsers. interest-cohort opts out of FLoC/Topics. web-share
+  # is allowed on self so the future "share trip" button can use the
+  # native sheet without re-permissioning.
+  Permissions-Policy: accelerometer=(), autoplay=(), camera=(), display-capture=(), fullscreen=(self), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), midi=(), payment=(), publickey-credentials-get=(), screen-wake-lock=(), serial=(), usb=(), web-share=(self), xr-spatial-tracking=(), interest-cohort=()
+
+  # Isolate this app's browsing context from cross-origin popups
+  # (Spectre / cross-window scripting mitigation).
+  Cross-Origin-Opener-Policy: same-origin
+
+  # Block other origins from loading our static assets as resources
+  # (script, image, etc.). Social-media OG-image scrapers are server-
+  # side fetchers and ignore CORP, so previews still work.
+  Cross-Origin-Resource-Policy: same-origin
+
+  # Content Security Policy. Strict baseline with explicit allowances:
+  #
+  #   script-src 'self'         Vite emits no inline scripts in prod;
+  #                             Mapbox is bundled, not loaded from CDN.
+  #   worker-src blob:          Mapbox GL spawns its tile worker from
+  #                             a blob: URL.
+  #   style-src 'unsafe-inline' Mapbox GL injects inline styles; React
+  #                             uses style={{}} attributes too. Hashes
+  #                             aren't tractable here.
+  #   font-src ... data:        Mapbox occasionally inlines glyphs as
+  #                             data URIs.
+  #   img-src ... data: blob:   Mapbox renders tiles into a canvas and
+  #                             reads them back as blobs.
+  #   connect-src               api.mapbox.com is the Directions /
+  #                             Geocoding / Tilequery host; events.
+  #                             mapbox.com is the GL JS telemetry
+  #                             beacon; *.tiles.mapbox.com is the tile
+  #                             CDN.
+  #   frame-ancestors 'none'    Anti-clickjacking. Strictly stronger
+  #                             than X-Frame-Options: DENY.
+  #   base-uri 'self'           Block <base href=...> injection.
+  #   form-action 'self'        No form posts off-site.
+  #   object-src 'none'         No <object>/<embed>/<applet>.
+  #   upgrade-insecure-requests Auto-rewrite any stray http:// asset.
+  Content-Security-Policy: default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; script-src 'self'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://api.mapbox.com https://*.tiles.mapbox.com; connect-src 'self' https://api.mapbox.com https://events.mapbox.com https://*.tiles.mapbox.com; manifest-src 'self'; upgrade-insecure-requests
+
+# JSON API responses don't need a CSP, but they DO need:
+#   - Vary: Origin so any cache treats different Origin requests as
+#     distinct (the function's origin allowlist branches on Origin).
+#   - no-referrer to keep state-code / coord query strings out of any
+#     downstream logs the upstream Mapbox host might keep.
+/api/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer
+  Vary: Origin
+  Cross-Origin-Resource-Policy: same-origin
+
+# Static assets get a long cache. The hashed filenames Vite emits make
+# this safe — a new build produces new filenames.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable

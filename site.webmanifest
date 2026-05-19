@@ -1,6 +1,9 @@
 {
-  "name": "MyWebSite",
-  "short_name": "MySite",
+  "name": "GunNav - Interstate Firearm Travel Planner",
+  "short_name": "GunNav",
+  "description": "The GPS for Gun Law. Assess interstate firearm transport against federal § 926A and state-specific frameworks. Informational only; not legal advice.",
+  "start_url": "/",
+  "scope": "/",
   "icons": [
     {
       "src": "/web-app-manifest-192x192.png",
@@ -15,7 +18,7 @@
       "purpose": "maskable"
     }
   ],
-  "theme_color": "#ffffff",
-  "background_color": "#ffffff",
+  "theme_color": "#0a0d12",
+  "background_color": "#0a0d12",
   "display": "standalone"
 }
